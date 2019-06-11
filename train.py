@@ -133,6 +133,8 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     logging.info('Evaluating on test set')
     if Path(dumpfn).exists() and Path(dumpfn).stat().st_size:
         model = load_model(str(dumpfn))
+    else:
+        model.save(str(dumpfn))
     test_x, test_y = data.x_y(test)
     pred = model.predict(test_x, batch_size=BATCH)
     data.dump_conll(pred_dir or tempfile.mkdtemp(), test, pred)
