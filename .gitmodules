@@ -1,0 +1,3 @@
+[submodule "standoff2conll"]
+	path = standoff2conll
+	url = git@github.com:lfurrer/standoff2conll.git
