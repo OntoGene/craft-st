@@ -5,7 +5,7 @@ CNN-BiLSTM for joint medical-entity recognition and normalisation.
 
 ## Howto
 
-- Get [CRAFT version 3](https://github.com/UCDenver-ccp/CRAFT/).
+- Get [CRAFT version 3](https://github.com/lfurrer/CRAFT).
 - Convert concept annotations to CoNLL format (see below).
 - Run the stand-alone script `train.py` (see `./run.py -h` for options).
 - Evaluate with the [official evaluation suite](https://github.com/UCDenver-ccp/craft-shared-tasks).
