@@ -30,9 +30,11 @@ from keras.optimizers import Adam
 
 
 BATCH = 32
+MAX_EPOCHS = 100
 # Default vocab size (used without pretrained embeddings).
 VOCAB_SIZE = 10000
 ALPHABET_SIZE = 200  # character vocabulary
+ONTO_ENTRIES = 5000  # random terminology entries per epoch
 
 NER_TAGS = tuple('OBIES')  # outside-label O is at 0
 NIL = 'NIL'
@@ -119,10 +121,10 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
 
     logging.info('Start training')
     try:
-        for i in it.count(1):
-            x, y = data.x_y(train, onto=5000)
-            model.fit(x, y, epochs=i, initial_epoch=i-1, batch_size=BATCH,
-                      callbacks=[earlystopping])
+        for epochs in epoch_organise(len(data.onto)):
+            x, y = data.x_y(train, onto=ONTO_ENTRIES)
+            model.fit(x, y, batch_size=BATCH, callbacks=[earlystopping],
+                      **epochs)
             if model.stop_training:
                 break
     except KeyboardInterrupt:
@@ -138,6 +140,19 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     for task, score in zip(('NER', 'NEN-1', 'NEN-2'), scores):
         logging.info('%s: %s', task, score)
     return scores
+
+
+def epoch_organise(available_entries):
+    """Call model.fit() once or many times?"""
+    if available_entries <= ONTO_ENTRIES:
+        # All entries go in every epoch.
+        # Reuse the same set of samples for all epochs.
+        yield dict(epochs=MAX_EPOCHS)
+    else:
+        # Create a new sample of onto entries for each epoch.
+        # Requires multiple calls to data.x_y() and model.fit().
+        for i in range(MAX_EPOCHS):
+            yield dict(initial_epoch=i, epochs=i+1)
 
 
 def build_network(pre_wemb, n_concepts, n_spans):
@@ -270,7 +285,7 @@ class Dataset:
     def x_y(self, docids, onto=0):
         """Padded input and output ndarrays."""
         ranges = [self.docs[d] for d in docids]
-        if onto > len(self.onto):
+        if onto >= len(self.onto):
             ranges.extend(self.onto)
         else:
             ranges.extend(random.sample(self.onto, onto))
