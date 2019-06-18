@@ -113,7 +113,8 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     train, dev, test = docs
 
     logging.info('Compiling graph')
-    model = build_network(pre_wemb, len(data.concept_ids), len(NER_TAGS))
+    model = build_network(
+        pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
     if dumpfn is None:
         with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as f:
             dumpfn = f.name
@@ -157,7 +158,7 @@ def epoch_organise(available_entries):
             yield dict(initial_epoch=i, epochs=i+1)
 
 
-def build_network(pre_wemb, n_concepts, n_spans):
+def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
     """Compile the graph with task-specific dimensions."""
     chars = Input(shape=(None, None), dtype='int32')
     char_emb = embedding_layer(voc=ALPHABET_SIZE, dim=50)(chars)
@@ -171,11 +172,15 @@ def build_network(pre_wemb, n_concepts, n_spans):
     lstm = LSTM(100, dropout=.1, recurrent_dropout=.1, return_sequences=True)
     mask = Masking(0).compute_mask(chars)
     bilstm = Bidirectional(lstm)(word_rep, mask=mask)
-    concepts_aux = Dense(n_concepts, activation='softmax')(bilstm)
+
+    features = [Input(shape=(None, n_concepts)) for _ in range(n_features)]
+
+    concepts_aux = Dense(n_concepts, activation='softmax')(
+        concat([bilstm, *features]) if features else bilstm)
     spans = Dense(n_spans, activation='softmax')(concat([bilstm, concepts_aux]))
     concepts = Dense(n_concepts, activation='softmax')(concat([bilstm, spans]))
 
-    model = Model(inputs=[words, chars],
+    model = Model(inputs=[words, chars, *features],
                   outputs=[spans, concepts_aux, concepts])
     model.compile(optimizer=Adam(lr=1e-3, amsgrad=True),
                   loss='categorical_crossentropy')
@@ -284,6 +289,11 @@ class Dataset:
                 self._index2concept[i] = c
         return self._index2concept
 
+    @property
+    def n_features(self):
+        """Number of features."""
+        return int(bool(self.vec.features))
+
     def x_y(self, docids, onto=0):
         """Padded input and output ndarrays."""
         ranges = [self.docs[d] for d in docids]
@@ -311,7 +321,7 @@ class Dataset:
         concept_tags = self.concept_ids
         sentences = select(self.flat, [self.docs[docid]])
         for sent, ts, cs in zip(sentences, terms, concepts):
-            for (tok, _, _, start, end), term, conc in zip(sent, ts, cs):
+            for (tok, _, _, start, end, *_), term, conc in zip(sent, ts, cs):
                 tag = '{}-{}'.format(NER_TAGS[term], concept_tags[conc])
                 yield tok, start, end, tag
             yield ()
@@ -320,16 +330,16 @@ class Dataset:
 def load_conll(lines):
     """Parse verticalised text with char offsets and IOB[ES] tags."""
     rows = csv.reader(lines, **TSV_FORMAT)
-    for has_content, group in it.groupby(rows, key=bool):
+    for has_content, group in it.groupby(rows, key=any):
         if not has_content:
             continue
         sent = []
-        for token, start, end, tag in group:
+        for token, start, end, tag, *feat in group:
             if tag == 'O':
                 label, concept = 'O', NIL
             else:
                 label, concept = tag.split('-', 1)
-            sent.append((token, label, concept, int(start), int(end)))
+            sent.append((token, label, concept, int(start), int(end), *feat))
         yield sent
 
 
@@ -375,9 +385,17 @@ def vectorised(data, vocab=None, vocab_size=None):
     _ = concept_ids[NIL]  # make sure NIL has index 0
     concepts = [[concept_ids[tag] for _, _, tag, *_ in sent] for sent in data]
 
-    return Vec(words, chars, terms, concepts, term_ids, concept_ids)
+    # Include optional dictionary features, while also updating concept_ids.
+    if any(len(e) > 5 for sent in data for e in sent):
+        features = [[concept_ids[e[5]] if len(e) > 5 else None for e in sent]
+                    for sent in data]
+    else:
+        features = []
 
-Vec = namedtuple('Vec', 'words chars terms concepts term_ids concept_ids')
+    return Vec(words, chars, terms, concepts, features, term_ids, concept_ids)
+
+Vec = namedtuple('Vec',
+                 'words chars terms concepts features term_ids concept_ids')
 
 
 def padded(vec, selection=((None, None),)):
@@ -395,14 +413,24 @@ def padded(vec, selection=((None, None),)):
         for j, word in enumerate(sent):
             chars[i, j, :len(word)] = word
 
-    tm = np.zeros(words.shape + (len(vec.term_ids),))
-    cn = np.zeros(words.shape + (len(vec.concept_ids),))
-    for arr, nums in ((tm, vec.terms), (cn, vec.concepts)):
-        for i, sent in enumerate(select(nums, selection)):
-            for j, label in enumerate(sent):
-                arr[i, j, label] = 1.
+    one_hot = [(vec.terms, vec.term_ids), (vec.concepts, vec.concept_ids)]
+    if vec.features:
+        one_hot.append((vec.features, vec.concept_ids))
+    terms, concepts, *features = (
+        to_one_hot((*words.shape, len(ids)), select(ind, selection))
+        for ind, ids in one_hot)
 
-    return [words, chars], [tm, cn, cn]
+    return [words, chars, *features], [terms, concepts, concepts]
+
+
+def to_one_hot(shape, indices):
+    """Create a 3D array with one-hot encoding."""
+    arr = np.zeros(shape)
+    for i, sent in enumerate(indices):
+        for j, pos in enumerate(sent):
+            if pos is not None:
+                arr[i, j, pos] = 1.
+    return arr
 
 
 def select(sequence, selections):
