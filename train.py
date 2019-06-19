@@ -27,6 +27,7 @@ from keras.layers import concatenate as concat, TimeDistributed as td, Masking
 from keras.layers import LSTM, Bidirectional
 from keras.callbacks import Callback
 from keras.optimizers import Adam
+from keras.utils import Sequence
 
 
 BATCH = 32
@@ -126,12 +127,9 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
 
     logging.info('Start training')
     try:
-        for epochs in epoch_organise(len(data.onto)):
-            x, y = data.x_y(train, onto=ONTO_ENTRIES)
-            model.fit(x, y, batch_size=BATCH, callbacks=[earlystopping],
-                      **epochs)
-            if model.stop_training:
-                break
+        batches = data.batches(train, onto=ONTO_ENTRIES)
+        model.fit_generator(batches, epochs=MAX_EPOCHS, shuffle=False,
+                            callbacks=[earlystopping])
     except KeyboardInterrupt:
         logging.info('Training aborted')  # jump to evaluation
 
@@ -147,19 +145,6 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     for task, score in zip(('NER', 'NEN-1', 'NEN-2'), scores):
         logging.info('%s: %s', task, score)
     return scores
-
-
-def epoch_organise(available_entries):
-    """Call model.fit() once or many times?"""
-    if available_entries <= ONTO_ENTRIES:
-        # All entries go in every epoch.
-        # Reuse the same set of samples for all epochs.
-        yield dict(epochs=MAX_EPOCHS)
-    else:
-        # Create a new sample of onto entries for each epoch.
-        # Requires multiple calls to data.x_y() and model.fit().
-        for i in range(MAX_EPOCHS):
-            yield dict(initial_epoch=i, epochs=i+1)
 
 
 def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
@@ -300,12 +285,19 @@ class Dataset:
 
     def x_y(self, docids, onto=0):
         """Padded input and output ndarrays."""
-        ranges = [self.docs[d] for d in docids]
+        ranges = self._ranges(docids)
         if onto >= len(self.onto):
             ranges.extend(self.onto)
         else:
             ranges.extend(random.sample(self.onto, onto))
         return padded(self.vec, ranges)
+
+    def batches(self, docids, onto=0):
+        """A Keras Sequence of padded batches."""
+        return PaddedBatches(self.vec, self._ranges(docids), self.onto, onto)
+
+    def _ranges(self, docids):
+        return [self.docs[d] for d in docids]
 
     def dump_conll(self, targetdir, docids, predictions):
         """Export predictions in CoNLL format."""
@@ -329,6 +321,39 @@ class Dataset:
                 tag = '{}-{}'.format(NER_TAGS[term], concept_tags[conc])
                 yield tok, start, end, tag
             yield ()
+
+
+class PaddedBatches(Sequence):
+    """Keras Sequence for padded batches of x and y."""
+
+    def __init__(self, vec, ranges, onto, n_onto, batch_size=BATCH):
+        self.vec = vec
+        self.onto = onto
+        self.indices = list(select(range(len(vec.words)), ranges))
+        self.n_onto = min(n_onto, len(onto))
+        self.batch_size = batch_size
+
+        self.current = None
+        self.on_epoch_end()
+
+    def __getitem__(self, idx):
+        selection = self.current[idx*self.batch_size : (idx+1)*self.batch_size]
+        return padded(self.vec, selection)
+
+    def __len__(self):
+        samples = len(self.indices) + self.n_onto
+        div, mod = divmod(samples, self.batch_size)
+        return div + bool(mod)
+
+    def on_epoch_end(self):
+        """Get an onto sample and shuffle with the corpus data."""
+        self.current = self.indices + self._onto_sample()
+        random.shuffle(self.current)
+
+    def _onto_sample(self):
+        if self.n_onto >= len(self.onto):
+            return self.onto
+        return random.sample(self.onto, self.n_onto)
 
 
 def load_conll(lines):
@@ -405,7 +430,6 @@ Vec = namedtuple('Vec',
 def padded(vec, selection=((None, None),)):
     """Prepare x and y as padded ndarrays."""
     sel = list(select(vec.words, selection))
-    logging.info('Padding %d sentences', len(sel))
     words = np.zeros((len(sel), max(map(len, sel))), dtype=int)
     for i, sent in enumerate(sel):
         words[i, :len(sent)] = sent
