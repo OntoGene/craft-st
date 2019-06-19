@@ -71,6 +71,10 @@ def main():
         '-m', '--model-path', type=Path, metavar='PATH',
         help='dump the Keras model in H5 format')
     ap.add_argument(
+        '-l', '--log-file', type=Path, metavar='PATH',
+        help='write results and some progress information to a log file '
+             '(in addition to output on STDOUT/STDERR)')
+    ap.add_argument(
         '-w', '--word-vectors', type=lambda p: np.load(p, mmap_mode='r'),
         metavar='PATH',
         help='numpy matrix with pretrained word vectors, '
@@ -85,19 +89,19 @@ def main():
         folds=args.folds,
         pred_dir=args.output_dir,
         dumpfn=args.model_path,
+        log_file=args.log_file,
         pre_wemb=args.word_vectors,
         vocab=args.vocab)
 
 
-def run(*args, **kwargs):
+def run(*args, log_level='INFO', log_file=None, **kwargs):
     """Perform 6-fold cross-validation."""
+    setup_logging(log_level, log_file)
     return list(iter_run(*args, **kwargs))
 
 
 def iter_run(conll_files, folds=range(1), vocab=None, onto=None, **kwargs):
     """Iteratively perform 6-fold cross-validation."""
-    logging.basicConfig(level=logging.INFO,
-                        format='%(asctime)s: %(message)s')
     data = Dataset.from_files(conll_files, vocab=vocab)
     if onto is not None:
         with Path(onto).open(encoding='utf8') as f:
@@ -462,6 +466,7 @@ class EarlyStoppingFScore(Callback):
         self.best = baseline
 
     def on_epoch_end(self, epoch, logs=None):
+        logging.info('Epoch %d: evaluate validation set', epoch + 1)
         current = self.evaluate()
         if current - self.min_delta > self.best:
             logging.info('Improved F1 -- saving model to %s', self.dumpfn)
@@ -558,6 +563,16 @@ class PRF:
 
     def __str__(self):
         return 'P: {0.prec:.3}, R: {0.rec:.3}, F1: {0.fscore:.3}'.format(self)
+
+
+def setup_logging(log_level='INFO', log_file=None):
+    logging.basicConfig(level=log_level,
+                        format='%(asctime)s: %(message)s')
+    if log_file is not None:
+        logger = logging.getLogger()  # root logger
+        handler = logging.FileHandler(str(log_file))
+        handler.setFormatter(logger.handlers[0].formatter)
+        logger.addHandler(handler)
 
 
 if __name__ == '__main__':
