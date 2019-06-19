@@ -6,8 +6,8 @@ res=$1
 target=$2
 # Additional args: passed to standoff2conll.py.
 
-CRAFT="CRAFT"
-s2c="standoff2conll/standoff2conll.py"
+CRAFT="$(pwd)/CRAFT"
+s2c="$(pwd)/standoff2conll/standoff2conll.py"
 
 tdir=$(mktemp -d)
 
