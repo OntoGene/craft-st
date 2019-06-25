@@ -163,9 +163,10 @@ def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
     bilstm = Bidirectional(lstm)(word_rep, mask=mask)
 
     features = [Input(shape=(None, n_concepts)) for _ in range(n_features)]
+    if features:
+        bilstm = concat([bilstm, *features])
 
-    concepts_aux = Dense(n_concepts, activation='softmax')(
-        concat([bilstm, *features]) if features else bilstm)
+    concepts_aux = Dense(n_concepts, activation='softmax')(bilstm)
     spans = Dense(n_spans, activation='softmax')(concat([bilstm, concepts_aux]))
     concepts = Dense(n_concepts, activation='softmax')(concat([bilstm, spans]))
 
