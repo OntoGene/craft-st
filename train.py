@@ -66,6 +66,10 @@ def main():
              '(4-column TSV with character offsets, '
              'ie. <token, start, end, tag>)')
     ap.add_argument(
+        '-t', '--terminology', type=Path, metavar='PATH',
+        help='terminology file in Bio Term Hub TSV format '
+             '(additional training samples)')
+    ap.add_argument(
         '-o', '--output-dir', type=Path, metavar='PATH',
         help='target directory for the test-set predictions')
     ap.add_argument(
@@ -87,6 +91,7 @@ def main():
     args = ap.parse_args()
 
     run(args.input_dir.glob('*'),
+        onto=args.terminology,
         folds=args.folds,
         pred_dir=args.output_dir,
         dumpfn=args.model_path,
