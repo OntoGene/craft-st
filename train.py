@@ -11,6 +11,7 @@ Train and test a model for one entity type of the CRAFT corpus.
 
 import re
 import csv
+import json
 import random
 import logging
 import argparse
@@ -50,6 +51,9 @@ TSV_FORMAT = dict(
     quotechar=None,
 )
 
+# Directory containing this script.
+HERE = Path(__file__).parent
+
 
 def main():
     '''
@@ -57,9 +61,13 @@ def main():
     '''
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
-        '-f', '--folds', nargs='+', type=int, default=[0], choices=range(6),
-        metavar='{0..5}',
-        help='run which folds of the predefined 6-fold cross-validation?')
+        '-f', '--folds', nargs='+', type=int, default=[0], metavar='N',
+        help='run which fold(s) of the n-fold cross-validation? '
+             '(default: first fold only, ie. 0)')
+    ap.add_argument(
+        '-s', '--splits', type=Path, default=HERE/'splits.json',
+        help='a JSON file specifying document IDs for the train/dev/test '
+             'split of every fold (default: %(default)s)')
     ap.add_argument(
         '-i', '--input-dir', type=Path, metavar='PATH',
         help='directory with documents in CoNLL format '
@@ -101,38 +109,47 @@ def main():
 
 
 def run(*args, log_level='INFO', log_file=None, **kwargs):
-    """Perform 6-fold cross-validation."""
+    """Perform n-fold cross-validation."""
     setup_logging(log_level, log_file)
     return list(iter_run(*args, **kwargs))
 
 
-def iter_run(conll_files, folds=range(1), vocab=None, onto=None, **kwargs):
-    """Iteratively perform 6-fold cross-validation."""
+def iter_run(conll_files, vocab=None, onto=None, **kwargs):
+    """Iteratively perform n-fold cross-validation."""
     data = Dataset.from_files(conll_files, vocab=vocab)
     if onto is not None:
         with Path(onto).open(encoding='utf8') as f:
             data.add_onto(f)
 
-    for i, docs in enumerate(fold(sorted(data.docs), 6, dev_ratio=.45)):
+    return _iter_run(data, **kwargs)
+
+
+def _iter_run(data, folds=range(1), splits=None, **kwargs):
+    if splits is None:
+        # 6-fold CV with a dev set (almost) half the size of the test set.
+        splits = fold(sorted(data.docs), 6, dev_ratio=.45)
+    else:
+        with Path(splits).open(encoding='utf8') as f:
+            splits = json.load(f)
+
+    for i, docs in enumerate(splits):
         if i in folds:
             yield run_fold(data, docs, **kwargs)
 
 
 def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     """Train and evaluate one fold of cross-validation."""
-    train, dev, test = docs
-
     logging.info('Compiling graph')
     model = build_network(
         pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
     if dumpfn is None:
         with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as f:
             dumpfn = f.name
-    earlystopping = EarlyStoppingFScore(data.x_y(dev), dumpfn)
+    earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn)
 
     logging.info('Start training')
     try:
-        batches = data.batches(train, onto=ONTO_ENTRIES)
+        batches = data.batches(docs['train'], onto=ONTO_ENTRIES)
         model.fit_generator(batches, epochs=MAX_EPOCHS, shuffle=False,
                             callbacks=[earlystopping])
     except KeyboardInterrupt:
@@ -143,9 +160,9 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
         model = load_model(str(dumpfn))
     else:
         model.save(str(dumpfn))
-    test_x, test_y = data.x_y(test)
+    test_x, test_y = data.x_y(docs['test'])
     pred = model.predict(test_x, batch_size=BATCH)
-    data.dump_conll(pred_dir or tempfile.mkdtemp(), test, pred)
+    data.dump_conll(pred_dir or tempfile.mkdtemp(), docs['test'], pred)
     scores = [PRF.from_one_hot(y, p) for y, p in zip(test_y, pred)]
     for task, score in zip(('NER', 'NEN-1', 'NEN-2'), scores):
         logging.info('%s: %s', task, score)
@@ -215,7 +232,7 @@ def fold(elements, n, dev_ratio=1.):
         dev_size = round(dev_ratio*test_size)
         dev = train[:dev_size]
         train = train[dev_size:]
-        yield train, dev, test
+        yield dict(train=train, dev=dev, test=test)
         start += test_size
 
 
@@ -596,6 +613,7 @@ class PRF:
 
 
 def setup_logging(log_level='INFO', log_file=None):
+    """Messages go to console and (optionally) a log file."""
     logging.basicConfig(level=log_level,
                         format='%(asctime)s: %(message)s')
     if log_file is not None:
