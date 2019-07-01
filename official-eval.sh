@@ -2,16 +2,13 @@
 
 evaldir=$(mktemp -d)
 
+workers=4
 c2s="standoff2conll/conll2standoff.py"
 
-# TODO: parallelise this loop
 for path in "$@"; do
 	tgtdir="$evaldir/$(basename $path)"
 	mkdir "$tgtdir"
-	for fn in "$path"/*.conll; do
-		tgt="$tgtdir/$(basename $fn)"
-		$c2s < "$fn" > "${tgt%.conll}.bionlp"
-	done
+	ls "$path"/*.conll | parallel -j $workers "$c2s < {} > $tgtdir/{/.}.bionlp"
 done
 
 docker run --rm -v $evaldir:/files-to-evaluate ucdenverccp/craft-eval:3.1.2_0 \
