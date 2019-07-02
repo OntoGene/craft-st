@@ -145,7 +145,7 @@ def _iter_run(data, folds=range(1), splits=None, **kwargs):
             yield run_fold(data, docs, **kwargs)
 
 
-def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
+def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     """Train and evaluate one fold of cross-validation."""
     logging.info('Compiling graph')
     model = build_network(
@@ -163,15 +163,33 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
     except KeyboardInterrupt:
         logging.error('Training aborted')  # jump to evaluation
 
-    logging.info('Evaluating on test set')
+    # Recover from different situations:
+    # - if the model was ever saved, load that one (test on the best);
+    # - if it was never saved, save it now.
     if Path(dumpfn).exists() and Path(dumpfn).stat().st_size:
         model = load_model(str(dumpfn))
     else:
+        logging.info('Saving model to %s', dumpfn)
         model.save(str(dumpfn))
-    test_x, test_y = data.x_y(docs['test'])
-    pred = model.predict(test_x, batch_size=BATCH)
-    data.dump_conll(pred_dir or tempfile.mkdtemp(), docs['test'], pred)
-    scores = [PRF.from_one_hot(y, p) for y, p in zip(test_y, pred)]
+
+    return run_test(data, docs['test'], model, **kwargs)
+
+
+def run_test(data, docids, model, pred_dir=None):
+    """Make predictions and score them."""
+    logging.info('Evaluating on test set')
+    if pred_dir is None:
+        pred_dir = tempfile.mkdtemp()
+    # Process each article separately to avoid memory problems.
+    # Model.predict_generator is tricky because each batch is padded
+    # differently (shape mismatch when Keras concatenates).
+    scores = [PRF() for _ in range(3)]
+    for docid in docids:
+        test_x, test_y = data.x_y([docid])
+        pred = model.predict(test_x, batch_size=BATCH)
+        data.dump_conll(pred_dir, [docid], pred)
+        for y, p, s in zip(test_y, pred, scores):
+            s.update(**vars(PRF.from_one_hot(y, p)))
     for task, score in zip(('NER', 'NEN-1', 'NEN-2'), scores):
         logging.info('%s: %s', task, score)
     return scores
@@ -577,7 +595,7 @@ def zerodivision(fallback):
 class PRF:
     """Convenient container for precision, recall, F1."""
 
-    def __init__(self, tp, relevant, selected):
+    def __init__(self, tp=0, relevant=0, selected=0):
         self.tp = int(tp)
         self.relevant = int(relevant)  # TP + FN
         self.selected = int(selected)  # TP + FP
@@ -591,6 +609,12 @@ class PRF:
     def fn(self):
         """False negatives."""
         return self.relevant - self.tp
+
+    def update(self, tp=0, relevant=0, selected=0):
+        """Add to TP/rel/sel counts."""
+        self.tp += tp
+        self.relevant += relevant
+        self.selected += selected
 
     @classmethod
     def from_one_hot(cls, y, pred, neg=0):
