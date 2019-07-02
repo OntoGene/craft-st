@@ -358,7 +358,7 @@ class PaddedBatches(Sequence):
 
     def _onto_sample(self):
         if self.n_onto >= len(self.onto):
-            return self.onto
+            return list(self.onto)
         return random.sample(self.onto, self.n_onto)
 
 
