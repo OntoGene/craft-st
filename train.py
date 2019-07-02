@@ -17,6 +17,7 @@ import logging
 import argparse
 import tempfile
 import itertools as it
+import subprocess as sp
 from pathlib import Path
 from functools import wraps
 from collections import defaultdict, Counter, namedtuple
@@ -116,8 +117,13 @@ def run(*args, log_level='INFO', log_file=None, **kwargs):
 
 def iter_run(conll_files, vocab=None, onto=None, **kwargs):
     """Iteratively perform n-fold cross-validation."""
+    logging.info('Last commit: %s', get_commit_info('H'))
+    logging.info('Commit message: %s', get_commit_info('B'))
+    logging.info('Working directory %s', get_wd_state())
+
     data = Dataset.from_files(conll_files, vocab=vocab)
     if onto is not None:
+        logging.info('Loading ontology %s', onto)
         with Path(onto).open(encoding='utf8') as f:
             data.add_onto(f)
 
@@ -134,6 +140,8 @@ def _iter_run(data, folds=range(1), splits=None, **kwargs):
 
     for i, docs in enumerate(splits):
         if i in folds:
+            logging.info('Running fold %d (%d/%d/%d)',
+                         i, *(len(docs[s]) for s in ('train', 'dev', 'test')))
             yield run_fold(data, docs, **kwargs)
 
 
@@ -153,7 +161,7 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, pred_dir=None):
         model.fit_generator(batches, epochs=MAX_EPOCHS, shuffle=False,
                             callbacks=[earlystopping])
     except KeyboardInterrupt:
-        logging.info('Training aborted')  # jump to evaluation
+        logging.error('Training aborted')  # jump to evaluation
 
     logging.info('Evaluating on test set')
     if Path(dumpfn).exists() and Path(dumpfn).stat().st_size:
@@ -196,6 +204,13 @@ def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
                   outputs=[spans, concepts_aux, concepts])
     model.compile(optimizer=Adam(lr=1e-3, amsgrad=True),
                   loss='categorical_crossentropy')
+
+    logging.info('embeddings: %(input_dim)d, %(output_dim)d',
+                 vars(model.get_layer('embedding_2')))
+    logging.info('features: %d', n_features)
+    logging.info('span labels: %d', n_spans)
+    logging.info('concept labels: %d', n_concepts)
+
     return model
 
 
@@ -252,11 +267,13 @@ class Dataset:
     def from_files(cls, paths, **kwargs):
         """Construct a populated instance from docs in CoNLL format."""
         paths = list(map(Path, paths))
-        logging.info('Loading %d documents...', len(paths))
+        logging.info('Loading %d documents from %s...',
+                     len(paths), set(p.parent for p in paths))
         ds = cls(**kwargs)
         for p in paths:
             with p.open(encoding='utf8') as f:
                 ds.add_doc(p.stem, f)
+        logging.info('Loaded %d sentences', len(ds.flat))
         return ds
 
     def add_doc(self, docid, lines):
@@ -275,6 +292,7 @@ class Dataset:
         offset = len(self.flat)
         self.flat.extend(load_onto(lines))
         span = range(offset, len(self.flat))
+        logging.info('Loaded %d dictionary entries', len(span))
         if not self.onto:
             self.onto = span
         else:
@@ -621,6 +639,24 @@ def setup_logging(log_level='INFO', log_file=None):
         handler = logging.FileHandler(str(log_file))
         handler.setFormatter(logger.handlers[0].formatter)
         logger.addHandler(handler)
+
+
+def get_commit_info(spec):
+    '''Get some info about the current git commit.'''
+    args = ['git', 'log', '-1', '--pretty=%{}'.format(spec)]
+    compl = sp.run(args, stdout=sp.PIPE, cwd=str(HERE))
+    if compl.returncode == 0:
+        return compl.stdout.decode('utf8').strip()
+    return '<no commit info>'
+
+
+def get_wd_state():
+    """Is the working directory clean or not?"""
+    args = ['git', 'diff', 'HEAD', '--exit-code']
+    compl = sp.run(args, cwd=str(HERE))
+    if compl.returncode == 0:
+        return 'clean'
+    return 'dirty'
 
 
 if __name__ == '__main__':
