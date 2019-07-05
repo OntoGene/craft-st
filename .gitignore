@@ -1,1 +1,3 @@
 *.pyc
+vocab.txt
+w2v200.npy

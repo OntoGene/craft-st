@@ -112,7 +112,11 @@ def main():
 def run(*args, log_level='INFO', log_file=None, **kwargs):
     """Perform n-fold cross-validation."""
     setup_logging(log_level, log_file)
-    return list(iter_run(*args, **kwargs))
+    try:
+        return list(iter_run(*args, **kwargs))
+    except Exception:
+        logging.exception('Crash!')
+        raise
 
 
 def iter_run(conll_files, vocab=None, onto=None, **kwargs):
@@ -286,7 +290,7 @@ class Dataset:
         """Construct a populated instance from docs in CoNLL format."""
         paths = list(map(Path, paths))
         logging.info('Loading %d documents from %s...',
-                     len(paths), set(p.parent for p in paths))
+                     len(paths), set(str(p.parent) for p in paths))
         ds = cls(**kwargs)
         for p in paths:
             with p.open(encoding='utf8') as f:
@@ -361,6 +365,7 @@ class Dataset:
     def dump_conll(self, targetdir, docids, predictions):
         """Export predictions in CoNLL format."""
         logging.info('Exporting predictions to %s', targetdir)
+        Path(targetdir).mkdir(parents=True, exist_ok=True)
         for docid, rows in self.iter_conll(docids, predictions):
             path = (Path(targetdir)/docid).with_suffix('.conll')
             with path.open('w', encoding='utf8') as f:
