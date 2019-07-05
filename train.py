@@ -432,6 +432,7 @@ def load_conll(lines):
                 label, concept = 'O', NIL
             else:
                 label, concept = tag.split('-', 1)
+            feat = [NIL if f == 'O' else f.split('-', 1)[1] for f in feat]
             sent.append((token, label, concept, int(start), int(end), *feat))
         yield sent
 
