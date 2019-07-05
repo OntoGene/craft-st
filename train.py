@@ -432,7 +432,8 @@ def load_conll(lines):
                 label, concept = 'O', NIL
             else:
                 label, concept = tag.split('-', 1)
-            feat = [NIL if f == 'O' else f.split('-', 1)[1] for f in feat]
+            feat = [[NIL] if f == 'O' else f.split('-', 1)[1].split(';')
+                    for f in feat]
             sent.append((token, label, concept, int(start), int(end), *feat))
         yield sent
 
@@ -481,7 +482,8 @@ def vectorised(data, vocab=None, vocab_size=None):
 
     # Include optional dictionary features, while also updating concept_ids.
     if any(len(e) > 5 for sent in data for e in sent):
-        features = [[concept_ids[e[5]] if len(e) > 5 else None for e in sent]
+        features = [[[concept_ids[i] for i in e[5]] if len(e) > 5 else None
+                     for e in sent]
                     for sent in data]
     else:
         features = []
