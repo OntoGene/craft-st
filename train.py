@@ -102,6 +102,7 @@ def main():
     run(args.input_dir.glob('*'),
         onto=args.terminology,
         folds=args.folds,
+        splits=args.splits,
         pred_dir=args.output_dir,
         dumpfn=args.model_path,
         log_file=args.log_file,
