@@ -33,11 +33,12 @@ from keras.utils import Sequence
 
 
 BATCH = 32
+PRE_EPOCHS = 20  # pretraining epochs
 MAX_EPOCHS = 100
 # Default vocab size (used without pretrained embeddings).
 VOCAB_SIZE = 10000
 ALPHABET_SIZE = 200  # character vocabulary
-ONTO_ENTRIES = 5000  # random terminology entries per epoch
+ONTO_ENTRIES = 7000  # random terminology entries per epoch
 
 NER_TAGS = tuple('OBIES')  # outside-label O is at 0
 NIL = 'NIL'
@@ -160,9 +161,14 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
             dumpfn = f.name
     earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn)
 
-    logging.info('Start training')
     try:
-        batches = data.batches(docs['train'], onto=ONTO_ENTRIES)
+        if data.onto:
+            logging.info('Start pretraining')
+            batches = data.batches([], onto=ONTO_ENTRIES)
+            model.fit_generator(batches, epochs=PRE_EPOCHS, shuffle=False)
+
+        logging.info('Start training')
+        batches = data.batches(docs['train'])
         model.fit_generator(batches, epochs=MAX_EPOCHS, shuffle=False,
                             callbacks=[earlystopping])
     except KeyboardInterrupt:
