@@ -86,6 +86,9 @@ def main():
         '-m', '--model-path', type=Path, metavar='PATH',
         help='dump the Keras model in H5 format')
     ap.add_argument(
+        '-c', '--concept-ids', type=Path, metavar='PATH',
+        help='persist the mapping concept->index to disk')
+    ap.add_argument(
         '-l', '--log-file', type=Path, metavar='PATH',
         help='write results and some progress information to a log file '
              '(in addition to output on STDOUT/STDERR)')
@@ -106,6 +109,7 @@ def main():
         splits=args.splits,
         pred_dir=args.output_dir,
         dumpfn=args.model_path,
+        concept_ids=args.concept_ids,
         log_file=args.log_file,
         pre_wemb=args.word_vectors,
         vocab=args.vocab)
@@ -121,7 +125,7 @@ def run(*args, log_level='INFO', log_file=None, **kwargs):
         raise
 
 
-def iter_run(conll_files, vocab=None, onto=None, **kwargs):
+def iter_run(conll_files, vocab=None, onto=None, concept_ids=None, **kwargs):
     """Iteratively perform n-fold cross-validation."""
     logging.info('Last commit: %s', get_commit_info('H'))
     logging.info('Commit message: %s', get_commit_info('B'))
@@ -132,6 +136,11 @@ def iter_run(conll_files, vocab=None, onto=None, **kwargs):
         logging.info('Loading ontology %s', onto)
         with Path(onto).open(encoding='utf8') as f:
             data.add_onto(f)
+
+    concept_ids = temp_fallback(concept_ids, suffix='.labels')
+    logging.info('Persist concept-label indices to %s', concept_ids)
+    with concept_ids.open('w', encoding='utf8') as f:
+        print(data.concept_ids, sep='\n', file=f)
 
     return _iter_run(data, **kwargs)
 
@@ -156,9 +165,7 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     logging.info('Compiling graph')
     model = build_network(
         pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
-    if dumpfn is None:
-        with tempfile.NamedTemporaryFile(suffix='.h5', delete=False) as f:
-            dumpfn = f.name
+    dumpfn = temp_fallback(dumpfn, suffix='.h5')
     earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn)
 
     try:
@@ -283,13 +290,14 @@ def fold(elements, n, dev_ratio=1.):
 class Dataset:
     """Container for the whole data."""
 
-    def __init__(self, vocab=None):
+    def __init__(self, vocab=None, concept_ids=None):
         """Create an empty instance."""
         self.vocab = vocab
         self.flat = []  # all sentences, original data (words)
         self.docs = {}  # map doc IDs to sentence offsets
         self.onto = []  # indices of the ontology terms
         self._vec = None
+        self._concept_ids = concept_ids
         self._index2concept = None
 
     @classmethod
@@ -336,7 +344,9 @@ class Dataset:
     def vec(self):
         """Numeric representation of all items."""
         if self._vec is None:
-            self._vec = vectorised(self.flat, self.vocab)
+            self._vec = vectorised(self.flat, self.vocab,
+                                   concept_ids=self._concept_ids)
+            self._concept_ids = self._vec.concept_ids  # keep this up-to-date
         return self._vec
 
     @property
@@ -467,7 +477,14 @@ def index(elements, n, reserved=2):
     return {e: i for i, (e, _) in enumerate(counts.most_common(n), reserved)}
 
 
-def vectorised(data, vocab=None, vocab_size=None):
+def concept_enumerator(*args, **kwargs):
+    """An auto-increment defaultdict for mapping concept labels to indices."""
+    concept_ids = defaultdict(it.count().__next__, *args, **kwargs)
+    _ = concept_ids[NIL]  # make sure NIL has index 0
+    return concept_ids
+
+
+def vectorised(data, vocab=None, vocab_size=None, concept_ids=None):
     """Enumerate tokens, characters, terms, and concepts."""
     logging.info('Vectorising %d sentences', len(data))
     if vocab is None:
@@ -483,8 +500,8 @@ def vectorised(data, vocab=None, vocab_size=None):
 
     term_ids = dict(zip(NER_TAGS, it.count()))
     terms = [[term_ids[tag] for _, tag, *_ in sent] for sent in data]
-    concept_ids = defaultdict(it.count().__next__)
-    _ = concept_ids[NIL]  # make sure NIL has index 0
+    if concept_ids is None:
+        concept_ids = concept_enumerator()
     concepts = [[concept_ids[tag] for _, _, tag, *_ in sent] for sent in data]
 
     # Include optional dictionary features, while also updating concept_ids.
@@ -667,6 +684,14 @@ class PRF:
 
     def __str__(self):
         return 'P: {0.prec:.3}, R: {0.rec:.3}, F1: {0.fscore:.3}'.format(self)
+
+
+def temp_fallback(path, **kwargs):
+    """Create a temporary file if path is None."""
+    if path is None:
+        with tempfile.NamedTemporaryFile(delete=False, **kwargs) as f:
+            path = f.name
+    return Path(path)
 
 
 def setup_logging(log_level='INFO', log_file=None):
