@@ -140,7 +140,7 @@ def iter_run(conll_files, vocab=None, onto=None, concept_ids=None, **kwargs):
     concept_ids = temp_fallback(concept_ids, suffix='.labels')
     logging.info('Persist concept-label indices to %s', concept_ids)
     with concept_ids.open('w', encoding='utf8') as f:
-        print(data.concept_ids, sep='\n', file=f)
+        print(*data.concept_ids, sep='\n', file=f)
 
     return _iter_run(data, **kwargs)
 
