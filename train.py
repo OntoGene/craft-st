@@ -31,6 +31,8 @@ from keras.callbacks import Callback
 from keras.optimizers import Adam
 from keras.utils import Sequence
 
+from abbrevs import AbbrevMapper
+
 
 BATCH = 32
 PRE_EPOCHS = 20  # pretraining epochs
@@ -67,7 +69,8 @@ def main():
         help='run which fold(s) of the n-fold cross-validation? '
              '(default: first fold only, ie. 0)')
     ap.add_argument(
-        '-s', '--splits', type=Path, default=HERE/'splits.json',
+        '-s', '--splits', type=read_json, metavar='PATH',
+        default=str(HERE/'splits.json'),
         help='a JSON file specifying document IDs for the train/dev/test '
              'split of every fold (default: %(default)s)')
     ap.add_argument(
@@ -79,6 +82,10 @@ def main():
         '-t', '--terminology', type=Path, metavar='PATH',
         help='terminology file in Bio Term Hub TSV format '
              '(additional training samples)')
+    ap.add_argument(
+        '-a', '--abbrevs', type=read_json, metavar='PATH',
+        help='a JSON file with short/long mappings per document '
+             '(format: {"docid": {"xyz": "xtra young zebra", ...}})')
     ap.add_argument(
         '-o', '--output-dir', type=Path, metavar='PATH',
         help='target directory for the test-set predictions')
@@ -105,6 +112,7 @@ def main():
 
     run(args.input_dir.glob('*'),
         onto=args.terminology,
+        abbrevs=args.abbrevs,
         folds=args.folds,
         splits=args.splits,
         pred_dir=args.output_dir,
@@ -125,13 +133,14 @@ def run(*args, log_level='INFO', log_file=None, **kwargs):
         raise
 
 
-def iter_run(conll_files, vocab=None, onto=None, concept_ids=None, **kwargs):
+def iter_run(conll_files, vocab=None, onto=None, concept_ids=None,
+             abbrevs=None, **kwargs):
     """Iteratively perform n-fold cross-validation."""
     logging.info('Last commit: %s', get_commit_info('H'))
     logging.info('Commit message: %s', get_commit_info('B'))
     logging.info('Working directory %s', get_wd_state())
 
-    data = Dataset.from_files(conll_files, vocab=vocab)
+    data = Dataset.from_files(conll_files, vocab=vocab, abbrevs=abbrevs)
     if onto is not None:
         logging.info('Loading ontology %s', onto)
         with Path(onto).open(encoding='utf8') as f:
@@ -149,9 +158,6 @@ def _iter_run(data, folds=range(1), splits=None, dumpfn=None, **kwargs):
     if splits is None:
         # 6-fold CV with a dev set (almost) half the size of the test set.
         splits = fold(sorted(data.docs), 6, dev_ratio=.45)
-    else:
-        with Path(splits).open(encoding='utf8') as f:
-            splits = json.load(f)
 
     for i, docs in enumerate(splits):
         if i in folds:
@@ -292,7 +298,7 @@ def fold(elements, n, dev_ratio=1.):
 class Dataset:
     """Container for the whole data."""
 
-    def __init__(self, vocab=None, concept_ids=None):
+    def __init__(self, vocab=None, concept_ids=None, abbrevs=None):
         """Create an empty instance."""
         self.vocab = vocab
         self.flat = []  # all sentences, original data (words)
@@ -301,6 +307,8 @@ class Dataset:
         self._vec = None
         self._concept_ids = concept_ids
         self._index2concept = None
+        self.abbrevs = {docid: AbbrevMapper(a)
+                        for docid, a in abbrevs.items()} if abbrevs else None
 
     @classmethod
     def from_files(cls, paths, **kwargs):
@@ -322,7 +330,8 @@ class Dataset:
                             docid, *self.docs[docid])
         self.clear_cache()
         offset = len(self.flat)
-        self.flat.extend(load_conll(lines))
+        filter_ = self.abbrevs[docid].expand if self.abbrevs else None
+        self.flat.extend(load_conll(lines, filter_))
         self.docs[docid] = offset, len(self.flat)
 
     def add_onto(self, lines):
@@ -394,7 +403,10 @@ class Dataset:
         """Iterate over lines in CoNLL format."""
         terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 1))
         for docid in docids:
-            yield docid, self._conll_rows(docid, terms, concepts)
+            rows = self._conll_rows(docid, terms, concepts)
+            if self.abbrevs:
+                rows = self.abbrevs[docid].restore(rows)
+            yield docid, rows
 
     def _conll_rows(self, docid, terms, concepts):
         concept_tags = self.concept_ids
@@ -439,9 +451,11 @@ class PaddedBatches(Sequence):
         return random.sample(self.onto, self.n_onto)
 
 
-def load_conll(lines):
+def load_conll(lines, filter_=None):
     """Parse verticalised text with char offsets and IOB[ES] tags."""
     rows = csv.reader(lines, **TSV_FORMAT)
+    if filter_ is not None:
+        rows = filter_(rows)
     for has_content, group in it.groupby(rows, key=any):
         if not has_content:
             continue
@@ -470,6 +484,12 @@ def read_vocab(path, reserved=2):
     """Map vocabulary from a file (one word per line) to its position."""
     with Path(path).open(encoding='utf8') as f:
         return {l.strip(): i for i, l in enumerate(f, reserved)}
+
+
+def read_json(path):
+    """Read a JSON file from disk."""
+    with Path(path).open(encoding='utf8') as f:
+        return json.load(f)
 
 
 def index(elements, n, reserved=2):
