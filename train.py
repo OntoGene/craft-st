@@ -203,14 +203,14 @@ def run_test(data, docids, model, pred_dir=None):
     # Process each article separately to avoid memory problems.
     # Model.predict_generator is tricky because each batch is padded
     # differently (shape mismatch when Keras concatenates).
-    scores = [PRF() for _ in range(3)]
+    scores = [PRF() for _ in range(2)]
     for docid in docids:
         test_x, test_y = data.x_y([docid])
         pred = model.predict(test_x, batch_size=BATCH)
         data.dump_conll(pred_dir, [docid], pred)
         for y, p, s in zip(test_y, pred, scores):
             s.update(**vars(PRF.from_one_hot(y, p)))
-    for task, score in zip(('NER', 'NEN-1', 'NEN-2'), scores):
+    for task, score in zip(('NER', 'NEN'), scores):
         logging.info('%s: %s', task, score)
     return scores
 
@@ -234,12 +234,11 @@ def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
     if features:
         bilstm = concat([bilstm, *features])
 
-    concepts_aux = Dense(n_concepts, activation='softmax')(bilstm)
-    spans = Dense(n_spans, activation='softmax')(concat([bilstm, concepts_aux]))
+    spans = Dense(n_spans, activation='softmax')(bilstm)
     concepts = Dense(n_concepts, activation='softmax')(concat([bilstm, spans]))
 
     model = Model(inputs=[words, chars, *features],
-                  outputs=[spans, concepts_aux, concepts])
+                  outputs=[spans, concepts])
     model.compile(optimizer=Adam(lr=1e-3, amsgrad=True),
                   loss='categorical_crossentropy')
 
@@ -392,7 +391,7 @@ class Dataset:
 
     def iter_conll(self, docids, predictions):
         """Iterate over lines in CoNLL format."""
-        terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 2))
+        terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 1))
         for docid in docids:
             yield docid, self._conll_rows(docid, terms, concepts)
 
@@ -541,7 +540,7 @@ def padded(vec, selection=((None, None),)):
         to_one_hot((*words.shape, len(ids)), select(ind, selection))
         for ind, ids in one_hot)
 
-    return [words, chars, *features], [terms, concepts, concepts]
+    return [words, chars, *features], [terms, concepts]
 
 
 def to_one_hot(shape, indices):
@@ -599,14 +598,14 @@ class EarlyStoppingFScore(Callback):
 
     def evaluate(self):
         '''
-        Compute F1 for the last CR layer.
+        Compute F1 for the CR layer.
         '''
         x, y = self.val_data
         pred = self.model.predict(x)
-        for ys, preds, task in zip(y, pred, ('NER', 'NEN-1', 'NEN-2')):
+        for ys, preds, task in zip(y, pred, ('NER', 'NEN')):
             scores = PRF.from_one_hot(ys, preds)
             logging.info('%s: %s', task, scores)
-        return scores.fscore  # F-score for the second NEN output
+        return scores.fscore  # F-score for the NEN output
 
 
 def zerodivision(fallback):
