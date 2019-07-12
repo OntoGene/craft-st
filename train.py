@@ -145,7 +145,7 @@ def iter_run(conll_files, vocab=None, onto=None, concept_ids=None, **kwargs):
     return _iter_run(data, **kwargs)
 
 
-def _iter_run(data, folds=range(1), splits=None, **kwargs):
+def _iter_run(data, folds=range(1), splits=None, dumpfn=None, **kwargs):
     if splits is None:
         # 6-fold CV with a dev set (almost) half the size of the test set.
         splits = fold(sorted(data.docs), 6, dev_ratio=.45)
@@ -157,7 +157,9 @@ def _iter_run(data, folds=range(1), splits=None, **kwargs):
         if i in folds:
             logging.info('Running fold %d (%d/%d/%d)',
                          i, *(len(docs[s]) for s in ('train', 'dev', 'test')))
-            yield run_fold(data, docs, **kwargs)
+            if dumpfn is not None:
+                dumpfn = Path(str(dumpfn).format(fold=i))
+            yield run_fold(data, docs, dumpfn=dumpfn, **kwargs)
 
 
 def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
