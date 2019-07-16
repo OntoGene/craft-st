@@ -168,7 +168,8 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     model = build_network(
         pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
     dumpfn = temp_fallback(dumpfn, suffix='.h5')
-    earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn)
+    earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn,
+                                        patience=5)
 
     try:
         if data.onto:
@@ -507,7 +508,9 @@ def vectorised(data, vocab=None, vocab_size=None, concept_ids=None):
 
     # Include optional dictionary features, while also updating concept_ids.
     if any(len(e) > 5 for sent in data for e in sent):
-        features = [[[concept_ids[i] for i in e[5]] if len(e) > 5 else None
+        # Take the real dict feature for the corpus data,
+        # but reuse the label for the pretraining ontology terms.
+        features = [[[concept_ids[i] for i in (e[5] if len(e)>5 else [e[2]])]
                      for e in sent]
                     for sent in data]
     else:
