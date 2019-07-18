@@ -11,7 +11,7 @@ for path in "$@"; do
 	ls "$path"/*.conll | parallel -j $workers "$c2s < {} > $tgtdir/{/.}.bionlp"
 done
 
-docker run --rm -v $evaldir:/files-to-evaluate ucdenverccp/craft-eval:3.1.2_0 \
+docker run --rm -v $evaldir:/files-to-evaluate ucdenverccp/craft-eval:3.1.3_0.1.2 \
 	sh -c '(cd /home/craft/evaluation && boot javac eval-concept-annotations)'
 
 for path in "$@"; do
