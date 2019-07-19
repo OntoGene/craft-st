@@ -231,15 +231,13 @@ def build_network(pre_wemb, n_concepts, n_spans, n_features=0):
 
     words = Input(shape=(None,), dtype='int32')
     word_emb = embedding_layer(matrix=pre_wemb)(words)
-    word_rep = concat([word_emb, char_rep])
+
+    features = [Input(shape=(None, n_concepts)) for _ in range(n_features)]
+    word_rep = concat([word_emb, char_rep, *features])
 
     lstm = LSTM(100, dropout=.1, recurrent_dropout=.1, return_sequences=True)
     mask = Masking(0).compute_mask(chars)
     bilstm = Bidirectional(lstm)(word_rep, mask=mask)
-
-    features = [Input(shape=(None, n_concepts)) for _ in range(n_features)]
-    if features:
-        bilstm = concat([bilstm, *features])
 
     spans = Dense(n_spans, activation='softmax')(bilstm)
     concepts = Dense(n_concepts, activation='softmax')(concat([bilstm, spans]))
