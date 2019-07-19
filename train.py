@@ -174,7 +174,7 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     model = build_network(
         pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
     dumpfn = temp_fallback(dumpfn, suffix='.h5')
-    earlystopping = EarlyStoppingFScore(data.x_y(docs['dev']), dumpfn,
+    earlystopping = EarlyStoppingFScore((data, docs['dev']), dumpfn,
                                         patience=5)
 
     try:
@@ -207,6 +207,10 @@ def run_test(data, docids, model, pred_dir=None):
     logging.info('Evaluating on test set')
     if pred_dir is None:
         pred_dir = tempfile.mkdtemp()
+    return _run_test(data, docids, model, pred_dir)
+
+
+def _run_test(data, docids, model, pred_dir=None):
     # Process each article separately to avoid memory problems.
     # Model.predict_generator is tricky because each batch is padded
     # differently (shape mismatch when Keras concatenates).
@@ -214,7 +218,8 @@ def run_test(data, docids, model, pred_dir=None):
     for docid in docids:
         test_x, test_y = data.x_y([docid])
         pred = model.predict(test_x, batch_size=BATCH)
-        data.dump_conll(pred_dir, [docid], pred)
+        if pred_dir is not None:
+            data.dump_conll(pred_dir, [docid], pred)
         for y, p, s in zip(test_y, pred, scores):
             s.update(**vars(PRF.from_one_hot(y, p)))
     for task, score in zip(('NER', 'NEN'), scores):
@@ -621,12 +626,8 @@ class EarlyStoppingFScore(Callback):
         '''
         Compute F1 for the CR layer.
         '''
-        x, y = self.val_data
-        pred = self.model.predict(x)
-        for ys, preds, task in zip(y, pred, ('NER', 'NEN')):
-            scores = PRF.from_one_hot(ys, preds)
-            logging.info('%s: %s', task, scores)
-        return scores.fscore  # F-score for the NEN output
+        scores = _run_test(*self.val_data, self.model)
+        return scores[-1].fscore  # F-score for the NEN output
 
 
 def zerodivision(fallback):
