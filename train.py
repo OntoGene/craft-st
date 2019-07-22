@@ -23,7 +23,7 @@ from functools import wraps
 from collections import defaultdict, Counter, namedtuple
 
 import numpy as np
-from keras.models import Model, load_model
+from keras.models import Model
 from keras.layers import Input, Dense, Embedding, Conv1D, GlobalMaxPooling1D
 from keras.layers import concatenate as concat, TimeDistributed as td, Masking
 from keras.layers import LSTM, Bidirectional
@@ -91,7 +91,7 @@ def main():
         help='target directory for the test-set predictions')
     ap.add_argument(
         '-m', '--model-path', type=Path, metavar='PATH',
-        help='dump the Keras model in H5 format')
+        help='dump the weights of the Keras model')
     ap.add_argument(
         '-c', '--concept-ids', type=Path, metavar='PATH',
         help='persist the mapping concept->index to disk')
@@ -173,7 +173,7 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     logging.info('Compiling graph')
     model = build_network(
         pre_wemb, len(data.concept_ids), len(NER_TAGS), data.n_features)
-    dumpfn = temp_fallback(dumpfn, suffix='.h5')
+    dumpfn = temp_fallback(dumpfn, suffix='.weights')
     earlystopping = EarlyStoppingFScore((data, docs['dev']), dumpfn,
                                         patience=5)
 
@@ -194,10 +194,10 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     # - if the model was ever saved, load that one (test on the best);
     # - if it was never saved, save it now.
     if Path(dumpfn).exists() and Path(dumpfn).stat().st_size:
-        model = load_model(str(dumpfn))
+        model.load_weights(str(dumpfn))
     else:
-        logging.info('Saving model to %s', dumpfn)
-        model.save(str(dumpfn))
+        logging.info('Saving model weights to %s', dumpfn)
+        model.save_weights(str(dumpfn))
 
     return run_test(data, docs['test'], model, **kwargs)
 
@@ -611,10 +611,10 @@ class EarlyStoppingFScore(Callback):
         logging.info('Epoch %d: evaluate validation set', epoch + 1)
         current = self.evaluate()
         if current - self.min_delta > self.best:
-            logging.info('Improved F1 -- saving model to %s', self.dumpfn)
+            logging.info('Improved F1 -- saving weights to %s', self.dumpfn)
             self.wait = 0
             self.best = current
-            self.model.save(self.dumpfn)
+            self.model.save_weights(self.dumpfn)
         else:
             self.wait += 1
             if self.wait >= self.patience:
