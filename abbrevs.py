@@ -136,12 +136,12 @@ class AbbrevMapper:
         else:
             yield from it.repeat(tag, n)
 
-    def restore(self, rows):
+    def restore(self, rows, scored=False):
         """Reinsert original short forms for the long forms."""
         for offsets, grouped in it.groupby(rows, key=lambda r: r[1:3]):
             grouped = list(grouped)
             if self._needs_merging(grouped, offsets):
-                yield self._merge_rows(grouped, *offsets)
+                yield self._merge_rows(grouped, *offsets, scored)
             else:
                 yield from grouped
 
@@ -156,24 +156,33 @@ class AbbrevMapper:
             return True
         return False
 
-    def _merge_rows(self, rows, start, end):
+    def _merge_rows(self, rows, start, end, scores=None):
         toks, _, _, labels, *feat = zip(*rows)
+        if scores:
+            scores = list(map(float, feat[-1]))  # scores are in the last column
         try:
             short = self.memory[toks, start, end]
         except KeyError:
             short = self.long2short[toks]
-        label = self._merge_labels(labels, short)
-        feat = (';'.join(uniq(f)) for f in feat)
+        label = self._merge_labels(labels, short, scores)
+        feat = (';'.join(map(str, uniq(f))) for f in feat)
         return [short, start, end, label, *feat]
 
-    def _merge_labels(self, labels, short):
+    def _merge_labels(self, labels, short, scores):
         tags = ''.join(uniq(l[0] for l in labels))
-        labels = list(uniq(l[2:] for l in labels))
-        if len(labels) > 1:  # remove NILs and check again
-            labels = list(filter(NIL.__ne__, labels))
-        if len(labels) > 1:
-            logging.warning('multiple labels for %s: %s', short, labels)
-        return '-'.join((self._merge_tags(tags), ';'.join(labels)))
+        all_ids = [l[2:] for l in labels]
+        ids = list(uniq(all_ids))
+        if len(ids) > 1:  # remove NILs and check again
+            ids = list(filter(NIL.__ne__, ids))
+        if len(ids) > 1:
+            if scores:
+                id_ = all_ids[argmax(scores)]
+            else:
+                logging.warning('multiple ids for %s: %s', short, ids)
+                id_ = ';'.join(ids)
+        else:
+            (id_,) = ids
+        return '-'.join((self._merge_tags(tags), id_))
 
     @staticmethod
     def _merge_tags(tags):
@@ -196,6 +205,11 @@ class AbbrevMapper:
 def uniq(iterable):
     """Delete repeated adjacent elements in iterable."""
     return (u for u, _ in it.groupby(iterable))
+
+
+def argmax(sequence):
+    """Determine the index of the largest element in sequence."""
+    return max(range(len(sequence)), key=sequence.__getitem__)
 
 
 if __name__ == '__main__':

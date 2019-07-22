@@ -405,19 +405,21 @@ class Dataset:
     def iter_conll(self, docids, predictions):
         """Iterate over lines in CoNLL format."""
         terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 1))
+        scores = iter(predictions[0].max(-1) * predictions[1].max(-1))
         for docid in docids:
-            rows = self._conll_rows(docid, terms, concepts)
+            rows = self._conll_rows(docid, terms, concepts, scores)
             if self.abbrevs:
-                rows = self.abbrevs[docid].restore(rows)
+                rows = self.abbrevs[docid].restore(rows, scored=True)
             yield docid, rows
 
-    def _conll_rows(self, docid, terms, concepts):
+    def _conll_rows(self, docid, terms, concepts, scores):
         concept_tags = self.concept_ids
         sentences = select(self.flat, [self.docs[docid]])
-        for sent, ts, cs in zip(sentences, terms, concepts):
-            for (tok, _, _, start, end, *_), term, conc in zip(sent, ts, cs):
+        for sent, ts, cs, sc in zip(sentences, terms, concepts, scores):
+            tokens = zip(sent, ts, cs, sc)
+            for (tok, _, _, start, end, *_), term, conc, score in tokens:
                 tag = '{}-{}'.format(NER_TAGS[term], concept_tags[conc])
-                yield tok, start, end, tag
+                yield tok, start, end, tag, score
             yield ()
 
 
