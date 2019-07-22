@@ -1,3 +1,12 @@
 *.pyc
-vocab.txt
-w2v200.npy
+
+# Corpus data.
+/CRAFT
+/labeled
+/labeled.feat
+/fpred
+
+# External resources.
+/abbrevs.json
+/vocab*.txt
+/w2v200*.npy
