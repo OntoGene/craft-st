@@ -23,21 +23,22 @@ echo "Set enviorment variables\n"
 #! ---------------------------------- SET CONFIG -------------------------------
 
 #? EPOCHS
-epochs=10.0                 
+epochs=20                
 
 #? CUDA_VISIBLE_DEVICES
 cvd=$1
 
 #? CONFIGURATION ids, global, bioes, pretrain, pretrained_ids 
-configuration="pretrain"
+configuration="ids"
 
-#? ONTOLOGY        CHEBI, CL, PR, ...
-ontology='PR'
+#? ONTOLOGY        CHEBI, CL, PR, GO_MF, SO , MOP, UBERON, GO_BP, NCBITaxon, GO_CC,  ...
+ontology='GO_BP'
 
 #? LABEL FORMAT ->  TAG SET SIZE
-# for ids           -> CHEBI, CL, PR, ...
+# for bioes , iob   -> BIOES, IOB
+# for ids           -> CHEBI, CL, PR, GO_MF, SO ,UBERON, ...
 # for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
-export LABEL_FORMAT='PR.1000'
+export LABEL_FORMAT='UBERON'
 
 
 
@@ -57,8 +58,12 @@ if [ $configuration = "global" ];then
     export LABEL_FORMAT='GOBAL'
 
 elif [ $configuration = "ids" ];then
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/fold0'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_fold0'
+    # fold0, whole
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
+    
+    #export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
+    #export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
 
     export ONTOLOGY=$ontology
 
@@ -66,8 +71,8 @@ elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
     #? otherwise rewrite the set_up_env() method 
 
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/'$LABEL_FORMAT
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT'_E10'
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/'$LABEL_FORMAT'_full'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
     
     export ONTOLOGY=$ontology
 
@@ -80,9 +85,10 @@ elif [ $configuration = "pretrained_ids" ];then
     export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
 
 else
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/fold0'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_'$ontology'_fold0'
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
     export LABEL_FORMAT='BIOES'
+    export ONTOLOGY=$ontology
 fi
 
 

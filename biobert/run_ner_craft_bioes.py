@@ -30,7 +30,20 @@ NUM_LABELS_D = {
                 'PR':945,
                 'GO_BP':582,
                 'PR.1000':1827,
-                'PR.5000':5564
+                'PR.5000':5564,
+                'GO_MF':9,
+                'SO':187,
+                'MOP': 21,
+                'UBERON':833,
+                'GO_BP': 582,
+                'NCBITaxon': 142,
+                'GO_CC':221,
+                'CL':236,
+                'SO_EXT':325,
+                'GO_MF_EXT':218,
+                'CHEBI_EXT':670,
+                'PR_EXT':1078,
+                'GO_BP_EXT':663
                 }
 
 LABEL_SET_PRETRAIN = {} 
@@ -121,6 +134,7 @@ flags.DEFINE_integer("eval_batch_size", 8, "Total batch size for eval.")
 
 flags.DEFINE_integer("predict_batch_size", 8, "Total batch size for predict.")
 
+#! 1e-5 RECOMMENDED FOR NER JOSEPH (before 5e-5) 
 flags.DEFINE_float("learning_rate", 5e-5, "The initial learning rate for Adam.")
 
 flags.DEFINE_float("num_train_epochs", 10.0, "Total number of training epochs to perform.")
@@ -321,7 +335,8 @@ class NerProcessor(DataProcessor):
         assert FLAGS.configuration == 'ids', 'get_labels() function and configuration does not match'
         
         ontology = FLAGS.onto
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
+        path_to_data = FLAGS.data_dir + 'tag_set.txt'
+        #path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
         tag_set = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set = [ line.rstrip() for line  in f]
@@ -730,7 +745,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
 def main(_):
 
-
+    for key in tf.app.flags.FLAGS.flag_values_dict():
+        print(key, FLAGS[key].value)
+    time.sleep(5)
 
 
     tf.logging.set_verbosity(tf.logging.INFO)
@@ -921,6 +938,9 @@ if __name__ == "__main__":
     flags.mark_flag_as_required("vocab_file")
     flags.mark_flag_as_required("bert_config_file")
     flags.mark_flag_as_required("output_dir")
+
+    
+      
 
     #! JOSEPH
     NUM_LABELS_JO = set_up_env(NUM_LABELS_JO) 

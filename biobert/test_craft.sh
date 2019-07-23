@@ -20,21 +20,22 @@ echo "Set enviorment variables\n"
 #! ---------------------------------- SET CONFIG -------------------------------
 
 #? CHANGE MODEL NR TO SET THE RIGHT CHECKPOINT!!!
-model_nr=110000
+model_nr=103000
        
 #? CUDA_VISIBLE_DEVICES
 cvd=$1
 
 #? CONFIGURATION ids, global, bioes, pretrain, pretrained_ids 
-configuration="ids"
+configuration='ids'
 
-#? ONTOLOGY        CHEBI, CL, PR, GO_BP, ...
-ontology='PR'
+#? ONTOLOGY        CHEBI, CL, PR, GO_BP, GO_MF, GO_CC, MOP, NCBITaxon, PR, SO, UBERON...
+ontology='GO_BP'
 
 #? LABEL FORMAT ->  TAG SET SIZE
+# for bioes , iob   -> BIOES, IOB
 # for ids           -> CHEBI, CL, PR, ...
 # for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
-export LABEL_FORMAT='PR'
+export LABEL_FORMAT='GO_BP'
 
 
 #! --  2. --
@@ -54,9 +55,12 @@ if [ $configuration = "global" ];then
     export LABEL_FORMAT='GOBAL'
 
 elif [ $configuration = "ids" ];then
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/fold0'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_fold0'
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_fold0'
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
+
+    #export TMP_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
+    #export BIOBERT_TEST_MODEL_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
+    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
     export ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrain" ];then
@@ -76,14 +80,15 @@ elif [ $configuration = "pretrained_ids" ];then
 
     export ONTOLOGY=$ontology
 
-    export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/PR.1000'
+    export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
 
 else
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/GO_BP/whole'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_GO_BP'
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_GO_BP'
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
 
     export LABEL_FORMAT='BIOES'
+    export ONTOLOGY=$ontology
 fi
 
 
@@ -102,7 +107,7 @@ printf "%-30s %s\n" "CUDA_VISIBLE_DEVICES:" $cvd
 printf "%-30s %s\n" "Configuration:" $configuration
 
 
-sleep 5s
+sleep 6s
 
 echo "Edit checkpoint file\n"
 first_line='model_checkpoint_path: "model.ckpt-'$model_nr'"'
