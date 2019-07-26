@@ -14,7 +14,6 @@ import sys
 import logging
 import itertools as it
 from pathlib import Path
-from collections import Counter
 from typing import List, Dict, Iterable, Iterator
 
 import numpy as np
@@ -112,21 +111,33 @@ def _pick_run(results):
     winner_ser = min(range(len(results)), key=lambda i: results[i].ser())
     winner_f1 = max(range(len(results)), key=lambda i: results[i].f1())
     if winner_f1 != winner_ser:
-        logging.warning('picking unclear')
+        logging.warning('picking unclear: %d:%d (SER: %g:%g, F1: %g:%g)',
+                        winner_ser+1, winner_f1+1,
+                        results[winner_ser].ser(), results[winner_f1].ser(),
+                        results[winner_ser].f1(), results[winner_f1].f1())
     return winner_f1 + 1
 
 
 class Scorer:
     """Aggregator for micro SER/F1."""
     def __init__(self):
-        self.counts = Counter()
+        self.docs = []
+        self.counts = dict.fromkeys(
+            ['substitutions', 'insertions', 'deletions', 'matches',
+             'ref-count', 'prediction-count'],
+            0.)
 
     def update(self, row):
         """Update counts with a csv.DictReader row."""
-        self.counts.update((k, float(v)) for k, v in row.items())
+        self.docs.append(row['#document-id'])
+        for k in self.counts:
+            self.counts[k] += float(row[k])
 
     def f1(self):
         """F-Score."""
+        if not self.docs:
+            return float('-inf')
+
         c = self.counts
         try:
             return 2 * c['matches'] / (c['ref-count'] + c['prediction-count'])
@@ -135,6 +146,9 @@ class Scorer:
 
     def ser(self):
         """Slot error rate."""
+        if not self.docs:
+            return float('inf')
+
         c = self.counts
         numerator = c['substitutions'] + c['insertions'] + c['deletions']
         try:
