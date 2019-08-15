@@ -86,7 +86,7 @@ def load_model(model_path: Path, data: train.Dataset):
     pre_wemb = np.load(str(WVECTORS), mmap_mode='r')
     model = train.build_network(
         pre_wemb, len(data.concept_ids), len(train.NER_TAGS), data.n_features)
-    model.load_weights(str(model_path.with_suffix('.weights')))
+    model.load_weights(str(model_path))
     return model
 
 

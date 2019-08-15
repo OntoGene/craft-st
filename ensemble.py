@@ -47,15 +47,18 @@ def main():
 def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
     """Pick the best models and merge their predictions."""
     splits = train.read_json(SPLITS)
-    if pick_best:
-        result_files = sorted(
-            srcdir.glob('run*/{}_results.tsv'.format(etype.lower())))
+    result_files = sorted(
+        srcdir.glob('run*/{}_results.tsv'.format(etype.lower())))
+    if pick_best and result_files:
         runs = pick_runs_per_fold(result_files, splits)
         folds = [srcdir/'subm/{}.fold-{}.run-{}'.format(etype, f, r)
                  for f, r in enumerate(runs)]
         assert len(folds) == FOLDS, 'missing folds, found only {}'.format(folds)
     else:
         folds = list(srcdir.glob('subm/{}.fold-*.run-*'.format(etype)))
+        if pick_best:
+            logging.warning('no result files found for picking best run, '
+                            'using all %d fold/runs', len(folds))
     labels = [train.read_vocab(p/'labels', reserved=0) for p in folds]
     assert all(l == labels[0] for l in labels[1:]), 'differing labels'
     labels = labels[0]
