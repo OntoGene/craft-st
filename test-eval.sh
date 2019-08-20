@@ -15,7 +15,7 @@ done
 
 docker run --rm -v $evaldir:/files-to-evaluate -v $corpus:/corpus-distribution \
 	ucdenverccp/craft-eval:3.1.3_0.1.2 \
-	sh -c '(cd /home/craft/evaluation && boot javac eval-concept-annotations -c /corpus-distribution -i /files-to-evaluate -g /files-to-evaluate)'
+	sh -c '(cd /home/craft/evaluation && boot javac eval-concept-annotations -c /corpus-distribution -i /files-to-evaluate -g /corpus-distribution/gold-annotations/craft-ca)'
 
 for path in "$@"; do
 	cp $evaldir/$(basename $path)/*_results.tsv $path/
