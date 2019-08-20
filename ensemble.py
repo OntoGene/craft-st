@@ -9,6 +9,7 @@ Merge individual predictions into ensemble output.
 """
 
 
+import io
 import csv
 import sys
 import logging
@@ -30,7 +31,9 @@ HERE = Path(__file__).parent
 CORPUS = HERE / 'labeled.feat'
 SPLITS = HERE / 'splits.subm.json'
 VOCAB = HERE / 'vocab.res.txt'
+ALPHABET = HERE / 'alphabet.txt'
 ABBREVS = HERE / 'abbrevs.json'
+WVECTORS = HERE / 'w2v200.res.npy'
 
 
 def main():
@@ -51,29 +54,31 @@ def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
         srcdir.glob('run*/{}_results.tsv'.format(etype.lower())))
     if pick_best and result_files:
         runs = pick_runs_per_fold(result_files, splits)
-        folds = [srcdir/'subm/{}.fold-{}.run-{}'.format(etype, f, r)
-                 for f, r in enumerate(runs)]
-        assert len(folds) == FOLDS, 'missing folds, found only {}'.format(folds)
+        models = [srcdir/'models'/'{}.fold-{}.run-{}.h5'.format(etype, f, r)
+                  for f, r in enumerate(runs)]
+        assert len(models) == FOLDS, \
+            'missing folds, found only {}'.format(len(models))
     else:
-        folds = list(srcdir.glob('subm/{}.fold-*.run-*'.format(etype)))
+        models = list(srcdir.glob('models/{}.fold-*.run-*.h5'.format(etype)))
         if pick_best:
             logging.warning('no result files found for picking best run, '
-                            'using all %d fold/runs', len(folds))
-    labels = [train.read_vocab(p/'labels', reserved=0) for p in folds]
-    assert all(l == labels[0] for l in labels[1:]), 'differing labels'
-    labels = labels[0]
+                            'using all %d fold/runs', len(models))
 
     conll_files = (CORPUS/etype).glob('*')
+    labels = get_labels(models)
     vocab = train.read_vocab(VOCAB)
+    alphabet = train.read_vocab(ALPHABET)
     abbrevs = train.read_json(ABBREVS)
     data = train.Dataset.from_files(conll_files, vocab=vocab, concept_ids=labels,
-                                    abbrevs=abbrevs)
+                                    abbrevs=abbrevs, alphabet=alphabet)
+    ensemble = Ensemble(models, emb=WVECTORS, n_concepts=len(labels),
+                        n_spans=len(train.NER_TAGS), n_features=data.n_features)
+
     docs = splits[0]['test']
     assert len(docs) == TESTSET_SIZE, 'missing test documents'
-
     for docid in docs:
-        scores = _merge_scores(p/'{}.npz'.format(docid) for p in folds)
-        fix_disagreements(*scores)
+        x, _ = data.x_y([docid])
+        scores = ensemble.predict(x)
         data.dump_conll(tgtdir/etype, [docid], scores)
 
 
@@ -160,15 +165,35 @@ class Scorer:
             return float(bool(numerator))
 
 
-def _merge_scores(paths):
-    ner, nen = [], []
-    for p in paths:
-        with np.load(str(p)) as f:
-            ner.append(f['ner'])
-            nen.append(f['nen'])
-    ner = np.mean(ner, axis=0)
-    nen = np.mean(nen, axis=0)
-    return [ner, nen]
+class Ensemble:
+    """Wrapper for using multiple models in the same graph."""
+
+    def __init__(self, dumps, emb, **kwargs):
+        pre_wemb = np.load(str(emb), mmap_mode='r')
+        self.graph = train.build_network(pre_wemb, **kwargs)
+        self.weights = list(self._read_weights(dumps))
+
+    @staticmethod
+    def _read_weights(paths):
+        for p in paths:
+            with Path(p).open('rb') as f:
+                yield io.BytesIO(f.read())
+
+    def predict(self, x, batch_size=train.BATCH):
+        """Predict, average and fix disagreement."""
+        ner, nen = zip(*self.iter_predict(x, batch_size))
+        logging.debug('Merge predictions, fix disagreements')
+        ner = np.mean(ner, axis=0)
+        nen = np.mean(nen, axis=0)
+        fix_disagreements(ner, nen)
+        return ner, nen
+
+    def iter_predict(self, x, batch_size=train.BATCH):
+        """Iterate over predictions from all models."""
+        for i, weights in enumerate(self.weights, start=1):
+            logging.debug('Predicting (%d/%d)', i, len(self.weights))
+            self.graph.load_weights(weights)
+            yield self.graph.predict(x, batch_size=batch_size)
 
 
 # TODO: this should probably be done in train.Dataset.dump_conll()
@@ -194,6 +219,19 @@ def fix_disagreements(ner, nen):
             i = 0 if relevant > irrelevant else slice(1, None)
             ner[s, t, i] = 0
             nen[s, t, i] = 0
+
+
+def get_labels(model_paths):
+    """Get the labels for all models. They need to be identical."""
+    labels = None
+    for path in model_paths:
+        label_path = path.resolve().with_suffix('.labels')
+        tmp = train.read_vocab(label_path, reserved=0)
+        if labels is None:
+            labels = tmp
+        else:
+            assert tmp == labels, 'differing labels'
+    return labels
 
 
 if __name__ == '__main__':
