@@ -24,3 +24,9 @@ CNN-BiLSTM for joint medical-entity recognition and normalisation.
 ## Python Dependencies
 
 - `keras`
+
+
+## License
+
+The code in this repository is licensed under the [AGPL-3.0](LICENSE).  
+However, the code in the [biobert](/biobert) subdirectory uses an [Apache License](/biobert/LICENSE).
