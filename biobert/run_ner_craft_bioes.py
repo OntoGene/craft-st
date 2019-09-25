@@ -43,7 +43,12 @@ NUM_LABELS_D = {
                 'GO_MF_EXT':218,
                 'CHEBI_EXT':670,
                 'PR_EXT':1078,
-                'GO_BP_EXT':663
+                'GO_BP_EXT':663,
+                'UBERON_EXT':883,  #new
+                'NCBITaxon_EXT':158, #new
+                'MOP_EXT':26,   #new
+                'CL_EXT':241,   #new
+                'GO_CC_EXT':252 #new
                 }
 
 LABEL_SET_PRETRAIN = {} 

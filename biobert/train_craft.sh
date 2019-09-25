@@ -23,7 +23,7 @@ echo "Set enviorment variables\n"
 #! ---------------------------------- SET CONFIG -------------------------------
 
 #? EPOCHS
-epochs=20                
+epochs=55                
 
 #? CUDA_VISIBLE_DEVICES
 cvd=$1
@@ -32,13 +32,13 @@ cvd=$1
 configuration="ids"
 
 #? ONTOLOGY        CHEBI, CL, PR, GO_MF, SO , MOP, UBERON, GO_BP, NCBITaxon, GO_CC,  ...
-ontology='GO_BP'
+ontology='GO_CC_EXT'
 
 #? LABEL FORMAT ->  TAG SET SIZE
 # for bioes , iob   -> BIOES, IOB
 # for ids           -> CHEBI, CL, PR, GO_MF, SO ,UBERON, ...
 # for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
-export LABEL_FORMAT='UBERON'
+export LABEL_FORMAT='GO_CC_EXT'
 
 
 
@@ -59,11 +59,11 @@ if [ $configuration = "global" ];then
 
 elif [ $configuration = "ids" ];then
     # fold0, whole
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
+    #export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
+    #export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
     
-    #export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
-    #export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
 
     export ONTOLOGY=$ontology
 
@@ -85,8 +85,14 @@ elif [ $configuration = "pretrained_ids" ];then
     export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
 
 else
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    # EXT
+    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_bioes_bert_data/'$ontology'/whole'
+    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
+
+    # NOT ext
+    # export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
+    # export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    
     export LABEL_FORMAT='BIOES'
     export ONTOLOGY=$ontology
 fi
