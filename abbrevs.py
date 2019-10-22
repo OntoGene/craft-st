@@ -161,7 +161,7 @@ class AbbrevMapper:
         if scores:
             scores = list(map(float, feat[-1]))  # scores are in the last column
         try:
-            short = self.memory[toks, start, end]
+            short = self.memory[toks, str(start), str(end)]
         except KeyError:
             short = self.long2short[toks]
         label = self._merge_labels(labels, short, scores)
