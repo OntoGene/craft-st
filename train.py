@@ -108,6 +108,9 @@ def main():
         '-V', '--vocab', type=read_vocab, metavar='PATH',
         help='vocabulary file, one token per line, corresponding to '
              'the vectors in the given matrix (starting from the third row)')
+    ap.add_argument(
+        '-A', '--alphabet', type=read_vocab, metavar='PATH',
+        help='character vocabulary, one character per line')
     args = ap.parse_args()
 
     run(args.input_dir.glob('*'),
@@ -120,7 +123,8 @@ def main():
         concept_ids=args.concept_ids,
         log_file=args.log_file,
         pre_wemb=args.word_vectors,
-        vocab=args.vocab)
+        vocab=args.vocab,
+        alphabet=args.alphabet)
 
 
 def run(*args, log_level='INFO', log_file=None, **kwargs):
@@ -134,13 +138,14 @@ def run(*args, log_level='INFO', log_file=None, **kwargs):
 
 
 def iter_run(conll_files, vocab=None, onto=None, concept_ids=None,
-             abbrevs=None, **kwargs):
+             abbrevs=None, alphabet=None, **kwargs):
     """Iteratively perform n-fold cross-validation."""
     logging.info('Last commit: %s', get_commit_info('H'))
     logging.info('Commit message: %s', get_commit_info('B'))
     logging.info('Working directory %s', get_wd_state())
 
-    data = Dataset.from_files(conll_files, vocab=vocab, abbrevs=abbrevs)
+    data = Dataset.from_files(conll_files, vocab=vocab, abbrevs=abbrevs,
+                              alphabet=alphabet)
     if onto is not None:
         logging.info('Loading ontology %s', onto)
         with Path(onto).open(encoding='utf8') as f:
@@ -301,9 +306,11 @@ def fold(elements, n, dev_ratio=1.):
 class Dataset:
     """Container for the whole data."""
 
-    def __init__(self, vocab=None, concept_ids=None, abbrevs=None):
+    def __init__(self, vocab=None, concept_ids=None, abbrevs=None,
+                 alphabet=None):
         """Create an empty instance."""
         self.vocab = vocab
+        self._alphabet = alphabet
         self.flat = []  # all sentences, original data (words)
         self.docs = {}  # map doc IDs to sentence offsets
         self.onto = []  # indices of the ontology terms
@@ -359,7 +366,8 @@ class Dataset:
         """Numeric representation of all items."""
         if self._vec is None:
             self._vec = vectorised(self.flat, self.vocab,
-                                   concept_ids=self._concept_ids)
+                                   concept_ids=self._concept_ids,
+                                   alphabet=self._alphabet)
             self._concept_ids = self._vec.concept_ids  # keep this up-to-date
         return self._vec
 
@@ -511,7 +519,8 @@ def concept_enumerator(*args, **kwargs):
     return concept_ids
 
 
-def vectorised(data, vocab=None, vocab_size=None, concept_ids=None):
+def vectorised(data, vocab=None, vocab_size=None, concept_ids=None,
+               alphabet=None):
     """Enumerate tokens, characters, terms, and concepts."""
     logging.info('Vectorising %d sentences', len(data))
     if vocab is None:
@@ -520,8 +529,9 @@ def vectorised(data, vocab=None, vocab_size=None, concept_ids=None):
 
     words = [[vocab.get(tok, 1) for tok, *_ in sent] for sent in data]
 
-    chars = (c for sent in data for tok, *_ in sent for c in tok)
-    alphabet = index(chars, ALPHABET_SIZE)
+    if alphabet is None:
+        chars = (c for sent in data for tok, *_ in sent for c in tok)
+        alphabet = index(chars, ALPHABET_SIZE)
     chars = [[[alphabet.get(c, 1) for c in tok] for tok, *_ in sent]
              for sent in data]
 

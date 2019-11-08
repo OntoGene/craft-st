@@ -9,4 +9,5 @@
 # External resources.
 /abbrevs.json
 /vocab*.txt
+/alphabet.txt
 /w2v200*.npy

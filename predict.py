@@ -33,6 +33,7 @@ TGTDIR = HERE / 'fpred'
 CORPUS = HERE / 'labeled.feat'
 SPLITS = HERE / 'splits.subm.json'
 VOCAB = HERE / 'vocab.res.txt'
+ALPHABET = HERE / 'alphabet.txt'
 ABBREVS = HERE / 'abbrevs.json'
 WVECTORS = HERE / 'w2v200.res.npy'
 
@@ -73,10 +74,11 @@ def load_data(label_path: Path):
     etype, fold = _spec_from_filename(label_path.name)
     conll_files = (CORPUS/etype).glob('*')
     vocab = train.read_vocab(VOCAB)
+    alphabet = train.read_vocab(ALPHABET)
     labels = train.read_vocab(label_path, reserved=0)
     abbrevs = train.read_json(ABBREVS)
     data = train.Dataset.from_files(conll_files, vocab=vocab, concept_ids=labels,
-                                    abbrevs=abbrevs)
+                                    abbrevs=abbrevs, alphabet=alphabet)
     docs = train.read_json(SPLITS)[fold]
     return data, etype, fold, docs
 
