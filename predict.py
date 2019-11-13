@@ -55,18 +55,21 @@ def predict(model_path: Path, targetdir: Path):
     """Create predictions for the dev set."""
     train.setup_logging()
     logging.info('Loading model %s', model_path)
-    data, etype, fold, docs = load_data(model_path)
-    model = load_model(model_path, data)
-    _, n_run = _model_symlink(etype, fold, targetdir/'models',
-                              model_path.resolve())
-
-    dev_dir = targetdir / 'run{}'.format(n_run) / etype
-    train.run_test(data, docs['dev'], model, dev_dir)
-
-
-def load_data(model_path: Path):
-    """Load data from default locations."""
     etype, fold = _spec_from_filename(model_path.name)
+    symlink, n_run = _model_symlink(etype, fold, targetdir/'models',
+                                    model_path.resolve())
+    try:
+        data, docs = load_data(model_path, etype, fold)
+        model = load_model(model_path, data)
+        dev_dir = targetdir / 'run{}'.format(n_run) / etype
+        train.run_test(data, docs['dev'], model, dev_dir)
+    except Exception:
+        symlink.unlink()
+        raise
+
+
+def load_data(model_path: Path, etype: str, fold: int):
+    """Load data from default locations."""
     conll_files = (CORPUS/etype).glob('*')
     vocab = train.read_vocab(VOCAB)
     alphabet = train.read_vocab(ALPHABET)
@@ -75,7 +78,7 @@ def load_data(model_path: Path):
     data = train.Dataset.from_files(conll_files, vocab=vocab, concept_ids=labels,
                                     abbrevs=abbrevs, alphabet=alphabet)
     docs = train.read_json(SPLITS)[fold]
-    return data, etype, fold, docs
+    return data, docs
 
 
 def load_model(model_path: Path, data: train.Dataset):
@@ -103,7 +106,9 @@ def _model_symlink(etype, fold, targetdir, model_path):
         try:
             path.symlink_to(model_path)
         except FileExistsError:
-            pass
+            if path.resolve() == model_path:
+                raise RuntimeError('model already covered: {}'
+                                   .format(model_path))
         else:
             break
     return path, n_run
