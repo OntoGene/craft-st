@@ -15,7 +15,7 @@ import sys
 import logging
 import itertools as it
 from pathlib import Path
-from typing import List, Dict, Iterable, Iterator
+from typing import List, Dict, Iterable
 
 import numpy as np
 
@@ -54,6 +54,7 @@ def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
         srcdir.glob('run*/{}_results.tsv'.format(etype.lower())))
     if pick_best and result_files:
         runs = pick_runs_per_fold(result_files, splits)
+        logging.info('best runs: %s', runs)
         models = [srcdir/'models'/'{}.fold-{}.run-{}.h5'.format(etype, f, r)
                   for f, r in enumerate(runs)]
         assert len(models) == FOLDS, \
@@ -83,7 +84,7 @@ def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
 
 
 def pick_runs_per_fold(result_files: Iterable[Path],
-                       splits: Iterable[Dict[str, List[str]]]) -> Iterator[int]:
+                       splits: Iterable[Dict[str, List[str]]]) -> List[int]:
     """
     Pick the best run for each fold, based on the official scores.
 
@@ -98,8 +99,7 @@ def pick_runs_per_fold(result_files: Iterable[Path],
     for f, docs in enumerate(splits):
         docs_by_fold.update(dict.fromkeys(docs['dev'], f))
     results = [_parse_results(p, docs_by_fold) for p in result_files]
-    for scores in zip(*results):
-        yield _pick_run(scores)
+    return [_pick_run(scores) for scores in zip(*results)]
 
 
 def _parse_results(path, docs_by_fold):
