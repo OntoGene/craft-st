@@ -180,10 +180,18 @@ class Ensemble:
 
     def predict(self, x, batch_size=train.BATCH):
         """Predict, average and fix disagreement."""
-        ner, nen = zip(*self.iter_predict(x, batch_size))
         logging.debug('Merge predictions')
-        ner = np.mean(ner, axis=0)
-        nen = np.mean(nen, axis=0)
+        # Compute average scores, incrementally.
+        ner, nen = None, None
+        for t, c in self.iter_predict(x, batch_size):
+            try:
+                ner += t
+                nen += c
+            except TypeError:
+                ner = t
+                nen = c
+        ner /= len(self.weights)
+        nen /= len(self.weights)
         return ner, nen
 
     def iter_predict(self, x, batch_size=train.BATCH):
