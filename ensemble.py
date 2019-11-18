@@ -13,7 +13,6 @@ import io
 import csv
 import sys
 import logging
-import itertools as it
 from pathlib import Path
 from typing import List, Dict, Iterable
 
@@ -182,10 +181,9 @@ class Ensemble:
     def predict(self, x, batch_size=train.BATCH):
         """Predict, average and fix disagreement."""
         ner, nen = zip(*self.iter_predict(x, batch_size))
-        logging.debug('Merge predictions, fix disagreements')
+        logging.debug('Merge predictions')
         ner = np.mean(ner, axis=0)
         nen = np.mean(nen, axis=0)
-        fix_disagreements(ner, nen)
         return ner, nen
 
     def iter_predict(self, x, batch_size=train.BATCH):
@@ -194,31 +192,6 @@ class Ensemble:
             logging.debug('Predicting (%d/%d)', i, len(self.weights))
             self.graph.load_weights(weights)
             yield self.graph.predict(x, batch_size=batch_size)
-
-
-# TODO: this should probably be done in train.Dataset.dump_conll()
-
-def fix_disagreements(ner, nen):
-    """
-    Fix cases where NER and NEN disagree.
-
-    Disagreement means NER predicts O and NEN predicts a
-    non-NIL label, or vice versa.
-    In those cases, change either of them to O/NIL or to
-    the second-best label, whichever gives the higher score
-    in combination.
-    """
-    disagreements = (ner.argmax(-1)==0) != (nen.argmax(-1)==0)
-    for s, t in it.product(*map(range, disagreements.shape)):
-        if disagreements[s, t]:
-            # What scores better? O * NIL or max(BIES) * max(non-NIL)?
-            irrelevant = ner[s, t, 0] * nen[s, t, 0]
-            relevant = ner[s, t, 1:].max() * nen[s, t, 1:].max()
-            # Set the scores for the losing combination to zero,
-            # so it won't get picked later.
-            i = 0 if relevant > irrelevant else slice(1, None)
-            ner[s, t, i] = 0
-            nen[s, t, i] = 0
 
 
 def get_labels(model_paths):

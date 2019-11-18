@@ -401,17 +401,19 @@ class Dataset:
     def _ranges(self, docids):
         return [self.docs[d] for d in docids]
 
-    def dump_conll(self, targetdir, docids, predictions):
+    def dump_conll(self, targetdir, docids, predictions, force_agreement=True):
         """Export predictions in CoNLL format."""
-        logging.info('Exporting predictions to %s', targetdir)
         Path(targetdir).mkdir(parents=True, exist_ok=True)
-        for docid, rows in self.iter_conll(docids, predictions):
+        for docid, rows in self.iter_conll(docids, predictions, force_agreement):
             path = (Path(targetdir)/docid).with_suffix('.conll')
+            logging.info('Exporting predictions to %s', path)
             with path.open('w', encoding='utf8') as f:
                 csv.writer(f, **TSV_FORMAT).writerows(rows)
 
-    def iter_conll(self, docids, predictions):
+    def iter_conll(self, docids, predictions, force_agreement=True):
         """Iterate over lines in CoNLL format."""
+        if force_agreement:
+            fix_disagreements(*predictions)
         terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 1))
         scores = iter(predictions[0].max(-1) * predictions[1].max(-1))
         for docid in docids:
@@ -598,6 +600,29 @@ def select(sequence, selections):
             yield sequence[selection]
         else:
             yield from sequence[slice(*selection)]
+
+
+def fix_disagreements(ner, nen):
+    """
+    Fix cases where NER and NEN disagree.
+
+    Disagreement means NER predicts O and NEN predicts a
+    non-NIL label, or vice versa.
+    In those cases, change either of them to O/NIL or to
+    the second-best label, whichever gives the higher score
+    in combination.
+    """
+    disagreements = (ner.argmax(-1)==0) != (nen.argmax(-1)==0)
+    for s, t in it.product(*map(range, disagreements.shape)):
+        if disagreements[s, t]:
+            # What scores better? O * NIL or max(BIES) * max(non-NIL)?
+            irrelevant = ner[s, t, 0] * nen[s, t, 0]
+            relevant = ner[s, t, 1:].max() * nen[s, t, 1:].max()
+            # Set the scores for the losing combination to zero,
+            # so it won't get picked later.
+            i = 0 if relevant > irrelevant else slice(1, None)
+            ner[s, t, i] = 0
+            nen[s, t, i] = 0
 
 
 class EarlyStoppingFScore(Callback):
