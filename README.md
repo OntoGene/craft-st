@@ -45,6 +45,6 @@ If you use this code, please cite us:
 
 Lenz Furrer, Joseph Cornelius, and Fabio Rinaldi (2019):
 **UZH@CRAFT-ST: a Sequence-labeling Approach to Concept Recognition**.
-In: *Proceedings of the BioNLP Open Shared Tasks Workshop (BioNLP-OST 2019)*.
-| [PDF](https://github.com/OntoGene/craft-st/wiki/uploads/furrer-et-al-2019.pdf)
+In: *Proceedings of The 5th Workshop on BioNLP Open Shared Tasks (BioNLP-OST 2019)*.
+| [PDF](https://www.aclweb.org/anthology/D19-5726.pdf)
 | [bibtex](https://github.com/OntoGene/craft-st/wiki/uploads/furrer-et-al-2019.bib) |
