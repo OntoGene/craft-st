@@ -416,6 +416,7 @@ class Dataset:
             'none': self._pick_raw,
             'mutual': self._pick_mutual,
             'override': self._pick_override,
+            'backoff': self._pick_backoff,
         }[agreement]
         terms, concepts = map(iter, predictions)
         for docid in docids:
@@ -492,6 +493,24 @@ class Dataset:
             else:
                 # Relevant score <= irrelevant score.
                 t = c = 0
+        return t, c
+
+    def _pick_backoff(self, term, conc, feat):
+        """
+        Give preference to NEN, resort to NER+feature where missing.
+
+        This implements the logic used for combining BERT
+        predictions with OGER.
+        NER is allowed to "hop in" where NEN predicts NIL,
+        but only if NER and OGER agree.
+        """
+        t, c = term.argmax(), conc.argmax()
+        if c == 0 and t != 0:
+            c = self._concept_ids[min(feat)]  # lexically lowest ID
+            if c == 0:  # dict feature was NIL -> drop this entity
+                t = 0
+        elif t == 0 and c != 0:
+            t = term[1:].argmax()+1  # best relevant tag
         return t, c
 
 
