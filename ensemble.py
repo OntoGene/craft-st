@@ -46,7 +46,8 @@ def main():
     merge(etype, srcdir, tgtdir)
 
 
-def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
+def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True,
+          agreement: str = 'mutual'):
     """Pick the best models and merge their predictions."""
     splits = train.read_json(SPLITS)
     result_files = sorted(
@@ -79,7 +80,7 @@ def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True):
     for docid in docs:
         x, _ = data.x_y([docid])
         scores = ensemble.predict(x)
-        data.dump_conll(tgtdir/etype, [docid], scores)
+        data.dump_conll(tgtdir/etype, [docid], scores, agreement)
 
 
 def pick_runs_per_fold(result_files: Iterable[Path],

@@ -47,11 +47,16 @@ def main():
     ap.add_argument(
         '-t', '--targetdir', type=Path, metavar='PATH', default=TGTDIR,
         help='target directory for predictions (default: %(default)s)')
+    ap.add_argument(
+        '-g', '--agreement', metavar='STRATEGY', default='none',
+        choices=train.Dataset.agreement_strategies,
+        help='strategy for enforcing agreement in case of contradicting '
+             'predictions for NER and NEN (default: %(default)s)')
     args = ap.parse_args()
     predict(**vars(args))
 
 
-def predict(model_path: Path, targetdir: Path):
+def predict(model_path: Path, targetdir: Path, agreement: str = 'mutual'):
     """Create predictions for the dev set."""
     train.setup_logging()
     logging.info('Loading model %s', model_path)
@@ -62,7 +67,7 @@ def predict(model_path: Path, targetdir: Path):
         data, docs = load_data(model_path, etype, fold)
         model = load_model(model_path, data)
         dev_dir = targetdir / 'run{}'.format(n_run) / etype
-        train.run_test(data, docs['dev'], model, dev_dir)
+        train.run_test(data, docs['dev'], model, dev_dir, agreement)
     except Exception:
         symlink.unlink()
         raise

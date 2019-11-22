@@ -87,6 +87,11 @@ def main():
         help='a JSON file with short/long mappings per document '
              '(format: {"docid": {"xyz": "xtra young zebra", ...}})')
     ap.add_argument(
+        '-g', '--agreement', metavar='STRATEGY', default='none',
+        choices=Dataset.agreement_strategies,
+        help='strategy for enforcing agreement in case of contradicting '
+             'predictions for NER and NEN (default: %(default)s)')
+    ap.add_argument(
         '-o', '--output-dir', type=Path, metavar='PATH',
         help='target directory for the test-set predictions')
     ap.add_argument(
@@ -116,6 +121,7 @@ def main():
     run(args.input_dir.glob('*'),
         onto=args.terminology,
         abbrevs=args.abbrevs,
+        agreement=args.agreement,
         folds=args.folds,
         splits=args.splits,
         pred_dir=args.output_dir,
@@ -207,15 +213,15 @@ def run_fold(data, docs, pre_wemb=None, dumpfn=None, **kwargs):
     return run_test(data, docs['test'], model, **kwargs)
 
 
-def run_test(data, docids, model, pred_dir=None):
+def run_test(data, docids, model, pred_dir=None, agreement='mutual'):
     """Make predictions and score them."""
     logging.info('Evaluating on test set')
     if pred_dir is None:
         pred_dir = tempfile.mkdtemp()
-    return _run_test(data, docids, model, pred_dir)
+    return _run_test(data, docids, model, pred_dir, agreement)
 
 
-def _run_test(data, docids, model, pred_dir=None):
+def _run_test(data, docids, model, pred_dir=None, agreement='mutual'):
     # Process each article separately to avoid memory problems.
     # Model.predict_generator is tricky because each batch is padded
     # differently (shape mismatch when Keras concatenates).
@@ -224,7 +230,7 @@ def _run_test(data, docids, model, pred_dir=None):
         test_x, test_y = data.x_y([docid])
         pred = model.predict(test_x, batch_size=BATCH)
         if pred_dir is not None:
-            data.dump_conll(pred_dir, [docid], pred)
+            data.dump_conll(pred_dir, [docid], pred, agreement)
         for y, p, s in zip(test_y, pred, scores):
             s.update(**vars(PRF.from_one_hot(y, p)))
     for task, score in zip(('NER', 'NEN'), scores):
@@ -412,12 +418,7 @@ class Dataset:
 
     def iter_conll(self, docids, predictions, agreement='mutual'):
         """Iterate over lines in CoNLL format."""
-        pick = {
-            'none': self._pick_raw,
-            'mutual': self._pick_mutual,
-            'override': self._pick_override,
-            'backoff': self._pick_backoff,
-        }[agreement]
+        pick = getattr(self, self.agreement_strategies[agreement])
         terms, concepts = map(iter, predictions)
         for docid in docids:
             rows = self._conll_rows(docid, terms, concepts, pick)
@@ -441,6 +442,13 @@ class Dataset:
         tag = '{}-{}'.format(NER_TAGS[t], c_tags[c])
         score = term[t] * conc[c]
         return tag, score
+
+    agreement_strategies = {
+        'none': '_pick_raw',
+        'mutual': '_pick_mutual',
+        'override': '_pick_override',
+        'backoff': '_pick_backoff',
+    }
 
     @staticmethod
     def _pick_raw(term, conc, _):
