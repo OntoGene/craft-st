@@ -415,6 +415,7 @@ class Dataset:
         pick = {
             'none': self._pick_raw,
             'mutual': self._pick_mutual,
+            'override': self._pick_override,
         }[agreement]
         terms, concepts = map(iter, predictions)
         for docid in docids:
@@ -427,25 +428,26 @@ class Dataset:
         concept_tags = self.concept_ids
         sentences = select(self.flat, [self.docs[docid]])
         for sent, ts, cs in zip(sentences, terms, concepts):
-            for (tok, _, _, start, end), term, conc in zip(sent, ts, cs):
-                tag, score = self._pick_tags(term, conc, concept_tags, pick)
+            for (tok, _, _, start, end, *feat), term, conc in zip(sent, ts, cs):
+                tag, score = self._pick_tags(term, conc, concept_tags,
+                                             pick, *feat)
                 yield tok, start, end, tag, score
             yield ()
 
     @staticmethod
-    def _pick_tags(term, conc, c_tags, pick):
-        t, c = pick(term, conc)
+    def _pick_tags(term, conc, c_tags, pick, feat=None):
+        t, c = pick(term, conc, feat)
         tag = '{}-{}'.format(NER_TAGS[t], c_tags[c])
         score = term[t] * conc[c]
         return tag, score
 
     @staticmethod
-    def _pick_raw(term, conc):
+    def _pick_raw(term, conc, _):
         """Pick the highest-scoring tags, even if contradicting each other."""
         return term.argmax(), conc.argmax()
 
     @staticmethod
-    def _pick_mutual(term, conc):
+    def _pick_mutual(term, conc, _):
         """
         Pick the best-scoring agreeing combination.
 
@@ -463,6 +465,33 @@ class Dataset:
                 t, c = term[1:].argmax()+1, conc[1:].argmax()+1
             else:
                 t, c = 0, 0
+        return t, c
+
+    def _pick_override(self, term, conc, feat):
+        """
+        Pick the higher score of NER or NEN.
+
+        Trust the classifier with higher confidence,
+        override the other in case of disagreement.
+        If NER wins voting for a relevant token, pair it
+        with the dictionary feature (unlike _pick_mutual).
+        """
+        t, c = term.argmax(), conc.argmax()
+        if bool(t) != bool(c):  # disagreement
+            if conc[c] > term[t] and c != 0:
+                # Relevant concept > irrelevant term.
+                t = term[1:].argmax()+1  # best relevant tag
+            elif term[t] > conc[c] and t != 0:
+                # Relevant term > irrelevant concept.
+                # Trust the feature more than the concept prediction!
+                # In case of multiple features, pick the highest-scoring.
+                idxs = map(self._concept_ids.__getitem__, feat)
+                c = max(idxs, key=conc.__getitem__)
+                if c == 0:  # feature was NIL -> fall back to best relevant
+                    c = conc[1:].argmax()+1
+            else:
+                # Relevant score <= irrelevant score.
+                t = c = 0
         return t, c
 
 
