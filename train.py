@@ -401,41 +401,69 @@ class Dataset:
     def _ranges(self, docids):
         return [self.docs[d] for d in docids]
 
-    def dump_conll(self, targetdir, docids, predictions, force_agreement=True):
+    def dump_conll(self, targetdir, docids, predictions, agreement='mutual'):
         """Export predictions in CoNLL format."""
         Path(targetdir).mkdir(parents=True, exist_ok=True)
-        for docid, rows in self.iter_conll(docids, predictions, force_agreement):
+        for docid, rows in self.iter_conll(docids, predictions, agreement):
             path = (Path(targetdir)/docid).with_suffix('.conll')
             logging.info('Exporting predictions to %s', path)
             with path.open('w', encoding='utf8') as f:
                 csv.writer(f, **TSV_FORMAT).writerows(rows)
 
-    def iter_conll(self, docids, predictions, force_agreement=True):
+    def iter_conll(self, docids, predictions, agreement='mutual'):
         """Iterate over lines in CoNLL format."""
-        if force_agreement:
-            fix_disagreements(*predictions)
+        pick = {
+            'none': self._pick_raw,
+            'mutual': self._pick_mutual,
+        }[agreement]
         terms, concepts = map(iter, predictions)
         for docid in docids:
-            rows = self._conll_rows(docid, terms, concepts)
+            rows = self._conll_rows(docid, terms, concepts, pick)
             if self.abbrevs:
                 rows = self.abbrevs[docid].restore(rows, scored=True)
             yield docid, rows
 
-    def _conll_rows(self, docid, terms, concepts):
+    def _conll_rows(self, docid, terms, concepts, pick):
         concept_tags = self.concept_ids
         sentences = select(self.flat, [self.docs[docid]])
         for sent, ts, cs in zip(sentences, terms, concepts):
-            for (tok, _, _, start, end, *_), term, conc in zip(sent, ts, cs):
-                tag, score = self._pick_tags(term, conc, concept_tags)
+            for (tok, _, _, start, end), term, conc in zip(sent, ts, cs):
+                tag, score = self._pick_tags(term, conc, concept_tags, pick)
                 yield tok, start, end, tag, score
             yield ()
 
     @staticmethod
-    def _pick_tags(term, conc, c_tags):
-        t, c = term.argmax(), conc.argmax()
+    def _pick_tags(term, conc, c_tags, pick):
+        t, c = pick(term, conc)
         tag = '{}-{}'.format(NER_TAGS[t], c_tags[c])
         score = term[t] * conc[c]
         return tag, score
+
+    @staticmethod
+    def _pick_raw(term, conc):
+        """Pick the highest-scoring tags, even if contradicting each other."""
+        return term.argmax(), conc.argmax()
+
+    @staticmethod
+    def _pick_mutual(term, conc):
+        """
+        Pick the best-scoring agreeing combination.
+
+        Disagreement means NER predicts O and NEN predicts a
+        non-NIL label, or vice versa.
+        In those cases, change either of them to O/NIL or to
+        the second-best label, whichever gives the higher
+        score product.
+        """
+        t, c = term.argmax(), conc.argmax()
+        if bool(t) != bool(c):  # disagreement
+            irrelevant = term[0] * conc[0]
+            relevant = term[1:].max() * conc[1:].max()
+            if relevant > irrelevant:
+                t, c = term[1:].argmax()+1, conc[1:].argmax()+1
+            else:
+                t, c = 0, 0
+        return t, c
 
 
 class PaddedBatches(Sequence):
@@ -605,29 +633,6 @@ def select(sequence, selections):
             yield sequence[selection]
         else:
             yield from sequence[slice(*selection)]
-
-
-def fix_disagreements(ner, nen):
-    """
-    Fix cases where NER and NEN disagree.
-
-    Disagreement means NER predicts O and NEN predicts a
-    non-NIL label, or vice versa.
-    In those cases, change either of them to O/NIL or to
-    the second-best label, whichever gives the higher score
-    in combination.
-    """
-    disagreements = (ner.argmax(-1)==0) != (nen.argmax(-1)==0)
-    for s, t in it.product(*map(range, disagreements.shape)):
-        if disagreements[s, t]:
-            # What scores better? O * NIL or max(BIES) * max(non-NIL)?
-            irrelevant = ner[s, t, 0] * nen[s, t, 0]
-            relevant = ner[s, t, 1:].max() * nen[s, t, 1:].max()
-            # Set the scores for the losing combination to zero,
-            # so it won't get picked later.
-            i = 0 if relevant > irrelevant else slice(1, None)
-            ner[s, t, i] = 0
-            nen[s, t, i] = 0
 
 
 class EarlyStoppingFScore(Callback):
