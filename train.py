@@ -414,23 +414,28 @@ class Dataset:
         """Iterate over lines in CoNLL format."""
         if force_agreement:
             fix_disagreements(*predictions)
-        terms, concepts = (iter(predictions[i].argmax(-1)) for i in (0, 1))
-        scores = iter(predictions[0].max(-1) * predictions[1].max(-1))
+        terms, concepts = map(iter, predictions)
         for docid in docids:
-            rows = self._conll_rows(docid, terms, concepts, scores)
+            rows = self._conll_rows(docid, terms, concepts)
             if self.abbrevs:
                 rows = self.abbrevs[docid].restore(rows, scored=True)
             yield docid, rows
 
-    def _conll_rows(self, docid, terms, concepts, scores):
+    def _conll_rows(self, docid, terms, concepts):
         concept_tags = self.concept_ids
         sentences = select(self.flat, [self.docs[docid]])
-        for sent, ts, cs, sc in zip(sentences, terms, concepts, scores):
-            tokens = zip(sent, ts, cs, sc)
-            for (tok, _, _, start, end, *_), term, conc, score in tokens:
-                tag = '{}-{}'.format(NER_TAGS[term], concept_tags[conc])
+        for sent, ts, cs in zip(sentences, terms, concepts):
+            for (tok, _, _, start, end, *_), term, conc in zip(sent, ts, cs):
+                tag, score = self._pick_tags(term, conc, concept_tags)
                 yield tok, start, end, tag, score
             yield ()
+
+    @staticmethod
+    def _pick_tags(term, conc, c_tags):
+        t, c = term.argmax(), conc.argmax()
+        tag = '{}-{}'.format(NER_TAGS[t], c_tags[c])
+        score = term[t] * conc[c]
+        return tag, score
 
 
 class PaddedBatches(Sequence):
