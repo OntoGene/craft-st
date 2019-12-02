@@ -448,6 +448,7 @@ class Dataset:
         'mutual': '_pick_mutual',
         'override': '_pick_override',
         'backoff': '_pick_backoff',
+        'spans': '_pick_spans',
     }
 
     @staticmethod
@@ -514,11 +515,24 @@ class Dataset:
         """
         t, c = term.argmax(), conc.argmax()
         if c == 0 and t != 0:
-            c = self._concept_ids[min(feat)]  # lexically lowest ID
-            if c == 0:  # dict feature was NIL -> drop this entity
-                t = 0
+            t, c = self._span_feature_combination(t, feat)
         elif t == 0 and c != 0:
             t = term[1:].argmax()+1  # best relevant tag
+        return t, c
+
+    def _pick_spans(self, term, _, feat):
+        """
+        Ignore NEN completely, use only NER+feature.
+        """
+        t, c = term.argmax(), 0
+        if t != 0:
+            t, c = self._span_feature_combination(t, feat)
+        return t, c
+
+    def _span_feature_combination(self, t, feat):
+        c = self._concept_ids[min(feat)]  # lexically lowest ID
+        if c == 0:  # dict feature was NIL -> drop this entity
+            t = 0
         return t, c
 
 
