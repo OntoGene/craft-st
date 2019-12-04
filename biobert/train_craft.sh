@@ -33,6 +33,9 @@ echo "Set environment variables\n"
 # for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
 : "${LABEL_FORMAT:=GO_CC_EXT}"
 
+# Project root directory
+: "${projdir:=data}"
+
 
 
 #! --  2. --
@@ -41,22 +44,18 @@ echo "Set environment variables\n"
 #! ++++++++++++++++++++++++++++++++++++++++
 #! CHANGE IF YOU WANT TO LOAD INIT WEIGHTS
 #! ++++++++++++++++++++++++++++++++++++++++
-BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/weights/biobert_v1.1_pubmed'
-
+BIOBERT_DIR="$projdir/weights/biobert_v1.1_pubmed"
+checkpoint="$BIOBERT_DIR/model.ckpt"
 
 
 if [ $configuration = "global" ];then
-    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_global_bert_data/fold0'
-    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_global'
-    LABEL_FORMAT='GOBAL'
+    NER_DIR="$projdir/data/global"
+    TMP_DIR="$projdir/tmp/global"
+    LABEL_FORMAT='GLOBAL'
 
 elif [ $configuration = "ids" ];then
-    # fold0, whole
-    # NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
-    # TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
-    
-    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
-    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
+    NER_DIR="$projdir/data/ids/${ontology}"
+    TMP_DIR="$projdir/tmp/ids-${ontology}"
 
     ONTOLOGY=$ontology
 
@@ -64,27 +63,24 @@ elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
     #? otherwise rewrite the set_up_env() method 
 
-    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/'$LABEL_FORMAT'_full'
-    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
+    NER_DIR="$projdir/data/pretrain/${LABEL_FORMAT}"
+    TMP_DIR="$projdir/pretrained/${LABEL_FORMAT}"
     
     ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrained_ids" ];then
-    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/fold0'
-    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_pretrained_ids_'$LABEL_FORMAT
+    NER_DIR="$projdir/data/ids/${ontology}"
+    TMP_DIR="$projdir/tmp/pretrained-ids-${LABEL_FORMAT}"
     
     ONTOLOGY=$ontology
 
-    BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
+    pretrained="$projdir/pretrained/${LABEL_FORMAT}"
+    checkpoint=$(ls "$pretrained"/model.ckpt-*.data* | sort | tail -n 1)
+    checkpoint=${checkpoint%.data*}
 
 else
-    # EXT
-    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_bioes_bert_data/'$ontology'/whole'
-    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
-
-    # NOT ext
-    # NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
-    # TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    NER_DIR="$projdir/data/spans/${ontology}"
+    TMP_DIR="$projdir/tmp/spans-${ontology}"
     
     LABEL_FORMAT='BIOES'
     ONTOLOGY=$ontology
@@ -120,7 +116,7 @@ CUDA_VISIBLE_DEVICES=$cvd python run_ner_craft_bioes.py \
       --num_train_epochs=$epochs \
       --vocab_file=$BIOBERT_DIR/vocab.txt \
       --bert_config_file=$BIOBERT_DIR/bert_config.json \
-      --init_checkpoint=$BIOBERT_DIR/model.ckpt \
+      --init_checkpoint=$checkpoint \
       --data_dir=$NER_DIR/ \
       --output_dir=$TMP_DIR \
       --onto=$ONTOLOGY \

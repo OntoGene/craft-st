@@ -21,6 +21,10 @@ import pickle
 import time
 import glob
 
+
+PROJDIR = os.path.join(os.path.dirname(__file__), 'data')
+
+
 # single  type 
 NUM_LABELS_D = {
                 'BIOES': 9,
@@ -169,7 +173,7 @@ def set_up_env(NUM_LABELS_JO):
         onto_size = FLAGS.label_format
 
         # load DICT
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/' + onto_size + '/tag_set_' + onto_size + '*' + '.txt'
+        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
         
         filename_list = glob.glob(path_to_data)
         assert len(filename_list) == 1 , 'filename list contains more than one file'
@@ -180,7 +184,7 @@ def set_up_env(NUM_LABELS_JO):
             tag_set_dict = [ line.rstrip() for line  in f]
 
         # load IDs
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
+        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
         tag_set_ids = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set_ids = [ line.rstrip() for line  in f]
@@ -341,7 +345,7 @@ class NerProcessor(DataProcessor):
         
         ontology = FLAGS.onto
         path_to_data = FLAGS.data_dir + 'tag_set.txt'
-        #path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
+        #path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
         tag_set = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set = [ line.rstrip() for line  in f]
@@ -368,7 +372,7 @@ class NerProcessor(DataProcessor):
         onto_size = FLAGS.label_format
 
         # load DICT
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/' + onto_size + '/tag_set_' + onto_size + '*' + '.txt'
+        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
         
         filename_list = glob.glob(path_to_data)
         assert len(filename_list) == 1 , 'filename list contains more than one file'
@@ -379,7 +383,7 @@ class NerProcessor(DataProcessor):
             tag_set_dict = [ line.rstrip() for line  in f]
 
         # load IDs
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
+        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
         tag_set_ids = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set_ids = [ line.rstrip() for line  in f]
@@ -413,7 +417,7 @@ class NerProcessor(DataProcessor):
         onto_size = FLAGS.label_format
 
         # load DICT
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/' + onto_size + '/tag_set_' + onto_size + '*' + '.txt'
+        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
         
         filename_list = glob.glob(path_to_data)
         assert len(filename_list) == 1 , 'filename list contains more than one file'
@@ -424,7 +428,7 @@ class NerProcessor(DataProcessor):
             tag_set_dict = [ line.rstrip() for line  in f]
 
         # load IDs
-        path_to_data = '/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/' + ontology + '/fold0/tag_set.txt'
+        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
         tag_set_ids = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set_ids = [ line.rstrip() for line  in f]
