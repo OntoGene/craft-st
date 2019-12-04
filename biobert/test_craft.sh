@@ -1,11 +1,5 @@
 #!/bin/sh
 
-if [ -z "$1" ]
-    then
-        echo "You have to set the CUDA_VISIBLE_DEVICES\nFirst commandline-argument = CUDA_VISIBLE_DEVICES "
-        return 0 
-        #exit 1
-fi
 #activate the right env
 source deactivate
 source activate tf_gpu
@@ -13,29 +7,30 @@ source activate tf_gpu
 
 echo "Run shell script!\n"
 
-# Set enviorment Variables
-echo "Set enviorment variables\n"
+# Set environment variables
+echo "Set environment variables\n"
 
 #! --  1. --
 #! ---------------------------------- SET CONFIG -------------------------------
 
 #? CHANGE MODEL NR TO SET THE RIGHT CHECKPOINT!!!
 model_nr=204000
-       
+
 #? CUDA_VISIBLE_DEVICES
-cvd=$1
+: "${cvd:=0}"
 
 #? CONFIGURATION ids, global, bioes, pretrain, pretrained_ids 
-configuration='ids'
+: "${configuration:=ids}"
 
 #? ONTOLOGY        CHEBI, CL, PR, GO_BP, GO_MF, GO_CC, MOP, NCBITaxon, PR, SO, UBERON...
-ontology='CL_EXT'
+: "${ontology:=CL_EXT}"
 
 #? LABEL FORMAT ->  TAG SET SIZE
 # for bioes , iob   -> BIOES, IOB
 # for ids           -> CHEBI, CL, PR, ...
 # for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
-export LABEL_FORMAT='CL_EXT'
+: "${LABEL_FORMAT:=CL_EXT}"
+
 
 
 #! --  2. --
@@ -44,67 +39,70 @@ export LABEL_FORMAT='CL_EXT'
 #! ++++++++++++++++++++++++++++++++++++++++
 #! CHANGE IF YOU WANT TO LOAD INIT WEIGHTS
 #! ++++++++++++++++++++++++++++++++++++++++
-export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/weights/biobert_v1.1_pubmed'
+BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/weights/biobert_v1.1_pubmed'
 
 
 
 if [ $configuration = "global" ];then
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_global_bert_data/fold0'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_global'
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_global'
-    export LABEL_FORMAT='GOBAL'
+    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_global_bert_data/fold0'
+    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_global'
+    BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_global'
+    LABEL_FORMAT='GOBAL'
 
 elif [ $configuration = "ids" ];then
 
-    #export TMP_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
-    #export BIOBERT_TEST_MODEL_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
+    # TMP_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
+    # BIOBERT_TEST_MODEL_DIR='/home/user/jcornelius/tmpbert/bioner_craft_ids_CHEBI_whole'
 
-    #Normal + tag_set fold0 in run_ner_bioes.py
-    #export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
-    #export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/BUG_bioner_craft_ids_'$ontology'_whole'
-    #export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
+    # Normal + tag_set fold0 in run_ner_bioes.py
+    # NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/whole'
+    # TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/BUG_bioner_craft_ids_'$ontology'_whole'
+    # BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ids_'$ontology'_whole'
     
     # EXT
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
+    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_ids_bert_data/'$ontology'/whole'
+    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
+    BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_ext_ids_'$ontology'_whole'
     
     
-    export ONTOLOGY=$ontology
+    ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
     #? otherwise rewrite the set_up_env() method 
 
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/'$LABEL_FORMAT
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
+    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/pretrain/conll_train/'$LABEL_FORMAT
+    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
+    BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
 
-    export ONTOLOGY=$ontology
+    ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrained_ids" ];then
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/fold0'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_pretrained_ids_'$LABEL_FORMAT
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_pretrained_ids_'$LABEL_FORMAT
+    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ids_bert_data/'$ontology'/fold0'
+    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_pretrained_ids_'$LABEL_FORMAT
+    BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_pretrained_ids_'$LABEL_FORMAT
 
-    export ONTOLOGY=$ontology
+    ONTOLOGY=$ontology
 
-    export BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
+    BIOBERT_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/pretrained/'$LABEL_FORMAT
 
 else
     # EXT
-    export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_bioes_bert_data/'$ontology'/whole'
-    export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
-    export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
+    NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_ext_bioes_bert_data/'$ontology'/whole'
+    TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
+    BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_ext_craft_bioes_finale_'$ontology
 
     # not EXT
-    # export NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
-    # export TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
-    # export BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    # NER_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/data/craft_bioes_bert_data/'$ontology'/whole'
+    # TMP_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
+    # BIOBERT_TEST_MODEL_DIR='/mnt/storage/scratch1/jocorn/craft/biobert/tmp/bioner_craft_bioes_finale_'$ontology
 
-    export LABEL_FORMAT='BIOES'
-    export ONTOLOGY=$ontology
+    LABEL_FORMAT='BIOES'
+    ONTOLOGY=$ontology
 fi
+
+
+export LABEL_FORMAT ONTOLOGY BIOBERT_DIR BIOBERT_TEST_MODEL_DIR NER_DIR TMP_DIR
 
 
 #! -----------------------------------------------------------------------------
