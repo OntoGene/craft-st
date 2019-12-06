@@ -365,54 +365,18 @@ class NerProcessor(DataProcessor):
 
     # #? IDS AND PRETRAIN
     def get_labels_pretrained_ids(self):
-        
         assert FLAGS.configuration == 'pretrained_ids', 'get_labels() function and configuration does not match'
-
-        ontology = FLAGS.onto
-        onto_size = FLAGS.label_format
-
-        # load DICT
-        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
-        
-        filename_list = glob.glob(path_to_data)
-        assert len(filename_list) == 1 , 'filename list contains more than one file'
-        filename = filename_list[0]
-        
-        tag_set_dict = []
-        with open(filename , 'r', encoding='utf-8') as f:
-            tag_set_dict = [ line.rstrip() for line  in f]
-
-        # load IDs
-        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        tag_set_ids = []
-        with open(path_to_data, 'r', encoding='utf-8') as f:
-            tag_set_ids = [ line.rstrip() for line  in f]
-        
-        set_tag_set = set(tag_set_dict + tag_set_ids)
-        tag_set = list(set_tag_set)
-
-
-
-
-        tag_set.append("X")
-        tag_set.append("[CLS]")
-        tag_set.append("[SEP]")
-        
-        
-        print('after', len(tag_set), tag_set,'\n\n\n\n\n')
-        print('PRETRAINED IDs')
-        print('SET SIZE: ', len(tag_set)+1 )
-
-        print_set_up(ontology, NUM_LABELS_JO, path_to_data)
-
-        return tag_set
+        return self._get_labels_pretraining()
 
 #* -----------------------------------------------------------------------------
 
     # #? PRETRAIN
     def get_labels_pretrain(self):
         assert FLAGS.configuration == 'pretrain', 'get_labels() function and configuration does not match'
-        
+        return self._get_labels_pretraining()
+
+    @staticmethod
+    def _get_labels_pretraining():
         ontology = FLAGS.onto
         onto_size = FLAGS.label_format
 
@@ -423,29 +387,27 @@ class NerProcessor(DataProcessor):
         assert len(filename_list) == 1 , 'filename list contains more than one file'
         filename = filename_list[0]
         
-        tag_set_dict = []
         with open(filename , 'r', encoding='utf-8') as f:
-            tag_set_dict = [ line.rstrip() for line  in f]
+            tag_set = [ line.rstrip() for line  in f]
+        tag_set_dict = set(tag_set)
 
-        # load IDs
+        # load IDs from training set
         path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        tag_set_ids = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
-            tag_set_ids = [ line.rstrip() for line  in f]
-        
-        set_tag_set = set(tag_set_dict + tag_set_ids)
-        tag_set = list(set_tag_set)
-        
+            for line in f:
+                tag = line.rstrip()
+                if tag not in tag_set_dict:
+                    tag_set.append(tag)
+
         tag_set.append("X")
         tag_set.append("[CLS]")
         tag_set.append("[SEP]")
-        
 
         print_set_up(ontology, NUM_LABELS_JO, path_to_data)
-        
+
         print('after', len(tag_set), tag_set,'\n\n\n\n\n')
-        print('PRETRAIN')
-        print('SET SIZE: ', len(tag_set)+1 )
+        print(FLAGS.configuration.upper())
+        print('SET SIZE: ', len(tag_set)+1)
 
         return tag_set
 
