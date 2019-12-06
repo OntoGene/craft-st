@@ -1,9 +1,5 @@
-#!/bin/sh
+#!/bin/zsh
 
-
-#activate the right env
-source deactivate
-source activate tf_gpu
 
 echo "Run shell script!\n"
 

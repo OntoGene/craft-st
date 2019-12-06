@@ -1,14 +1,12 @@
-#!/bin/sh
-
-#activate the right env
-source deactivate
-source activate tf_gpu
+#!/bin/zsh
 
 
 echo "Run shell script!\n"
 
 # Set environment variables
 echo "Set environment variables\n"
+
+
 
 #! --  1. --
 #! ---------------------------------- SET CONFIG -------------------------------
@@ -80,6 +78,7 @@ fi
 
 export LABEL_FORMAT ONTOLOGY BIOBERT_DIR NER_DIR TMP_DIR
 
+# Find the latest checkpoint.
 checkpoint=$(ls $TMP_DIR/model.ckpt-*.data* | sort | tail -n 1)
 checkpoint=${checkpoint%.data*}
 
@@ -119,23 +118,10 @@ CUDA_VISIBLE_DEVICES=$cvd python run_ner_craft_bioes.py \
 
 
 
-# get entity-level evaluation
-echo "Get entity level evaluation ...\n"
+# Undo WordPiece tokenization
+echo "Undo WordPiece tokenization ...\n"
 CUDA_VISIBLE_DEVICES=$cvd python biocodes/ner_detokenize.py \
     --token_test_path=$TMP_DIR/token_test.txt \
     --label_test_path=$TMP_DIR/label_test.txt \
     --answer_path=$NER_DIR/test.tsv \
     --output_dir=$TMP_DIR
-
-
-
-# get entity-level evaluation
-echo "Switch to python 2.7 enviroment to run conlleval.py\n"
-source deactivate
-source activate py27
-
-echo "Run conlleval.py\n"
-python conlleval.py $TMP_DIR/NER_result_conll.txt
-
-source deactivate
-source activate tf_gpu
