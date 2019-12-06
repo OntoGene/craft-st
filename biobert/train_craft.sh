@@ -23,11 +23,11 @@ echo "Set environment variables\n"
 #? ONTOLOGY        CHEBI, CL, PR, GO_MF, SO , MOP, UBERON, GO_BP, NCBITaxon, GO_CC,  ...
 : "${ontology:=GO_CC_EXT}"
 
-#? LABEL FORMAT ->  TAG SET SIZE
+#? LABEL DETAIL ->  TAG SET SIZE
 # for bioes , iob   -> BIOES, IOB
-# for ids           -> CHEBI, CL, PR, GO_MF, SO ,UBERON, ...
-# for pretraining   -> <ontology>.<desiredSize> exp.: CHEBI.1000
-: "${LABEL_FORMAT:=GO_CC_EXT}"
+# for ids           -> [ignored]
+# for pretraining   -> <tag-set size>, eg.: 1000
+: "${label_detail:=BIOES}"
 
 # Project root directory
 : "${projdir:=data}"
@@ -53,18 +53,21 @@ elif [ $configuration = "ids" ];then
     NER_DIR="$projdir/data/ids/${ontology}"
     TMP_DIR="$projdir/tmp/ids-${ontology}"
 
+    LABEL_FORMAT=$ontology
     ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
     #? otherwise rewrite the set_up_env() method 
 
+    LABEL_FORMAT="${ontology}.${label_detail}"
     NER_DIR="$projdir/data/pretrain/${LABEL_FORMAT}"
     TMP_DIR="$projdir/pretrained/${LABEL_FORMAT}"
     
     ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrained_ids" ];then
+    LABEL_FORMAT="${ontology}.${label_detail}"
     NER_DIR="$projdir/data/ids/${ontology}"
     TMP_DIR="$projdir/tmp/pretrained-ids-${LABEL_FORMAT}"
     
@@ -78,7 +81,7 @@ else
     NER_DIR="$projdir/data/spans/${ontology}"
     TMP_DIR="$projdir/tmp/spans-${ontology}"
     
-    LABEL_FORMAT='BIOES'
+    LABEL_FORMAT=$label_detail
     ONTOLOGY=$ontology
 fi
 
