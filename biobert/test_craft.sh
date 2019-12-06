@@ -55,7 +55,7 @@ elif [ $configuration = "ids" ];then
 
 elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
-    #? otherwise rewrite the set_up_env() method 
+    #? otherwise rewrite the set_up_env() method
 
     LABEL_FORMAT="${ontology}.${label_detail}"
     NER_DIR="$projdir/data/pretrain/${LABEL_FORMAT}"
@@ -78,8 +78,6 @@ else
     ONTOLOGY=$ontology
 fi
 
-
-export LABEL_FORMAT ONTOLOGY BIOBERT_DIR NER_DIR TMP_DIR
 
 # Find the latest checkpoint.
 checkpoint=$(ls $TMP_DIR/model.ckpt-*.data* | sort | tail -n 1)

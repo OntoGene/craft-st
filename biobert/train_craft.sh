@@ -29,6 +29,9 @@ echo "Set environment variables\n"
 # for pretraining   -> <tag-set size>, eg.: 1000
 : "${label_detail:=BIOES}"
 
+# Run prediction on test set right after training?
+: "${DO_PREDICT:=true}"
+
 # Project root directory
 : "${projdir:=data}"
 
@@ -58,12 +61,13 @@ elif [ $configuration = "ids" ];then
 
 elif [ $configuration = "pretrain" ];then
     #? is only valid in combination with ids
-    #? otherwise rewrite the set_up_env() method 
+    #? otherwise rewrite the set_up_env() method
 
     LABEL_FORMAT="${ontology}.${label_detail}"
     NER_DIR="$projdir/data/pretrain/${LABEL_FORMAT}"
     TMP_DIR="$projdir/pretrained/${LABEL_FORMAT}"
-    
+
+    DO_PREDICT=false
     ONTOLOGY=$ontology
 
 elif [ $configuration = "pretrained_ids" ];then
@@ -84,9 +88,6 @@ else
     LABEL_FORMAT=$label_detail
     ONTOLOGY=$ontology
 fi
-
-
-export LABEL_FORMAT ONTOLOGY BIOBERT_DIR NER_DIR TMP_DIR
 
 
 #! -----------------------------------------------------------------------------
@@ -111,7 +112,7 @@ sleep 8s
 
 CUDA_VISIBLE_DEVICES=$cvd python run_ner_craft_bioes.py \
       --do_train=true \
-      --do_eval=true \
+      --do_predict=$DO_PREDICT \
       --num_train_epochs=$epochs \
       --vocab_file=$BIOBERT_DIR/vocab.txt \
       --bert_config_file=$BIOBERT_DIR/bert_config.json \
