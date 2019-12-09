@@ -185,39 +185,36 @@ class DataProcessor(object):
     def _read_data(cls, input_file):
         """Reads a BIO data."""
         with open(input_file) as f:
-            lines = []
             words = []
             labels = []
             for line in f:
-                contends = line.strip()
-                if len(contends) == 0:
+                line = line.strip()
+                if line:
+                    word, *_, label = line.strip().split()
+                    words.append(word)
+                    labels.append(label)
+                else:
                     assert len(words) == len(labels)
-                    if len(words) > 30:
-                        while len(words) > 30:
-                            tmplabel = labels[:30]
-                            for iidx in range(len(tmplabel)):
-                                if tmplabel.pop() == 'O':
-                                     break
-                            l = ' '.join([label for label in labels[:len(tmplabel)+1] if len(label) > 0])
-                            w = ' '.join([word for word in words[:len(tmplabel)+1] if len(word) > 0])
-                            lines.append([l, w])
-                            words = words[len(tmplabel)+1:]
-                            labels = labels[len(tmplabel)+1:]
+                    while len(words) > 30:
+                        tmplabel = labels[:30]
+                        for _ in range(len(tmplabel)):
+                            if tmplabel.pop() == 'O':
+                                break
+                        cutoff = len(tmplabel) + 1
+                        l = ' '.join(filter(None, labels[:cutoff]))
+                        w = ' '.join(filter(None, words[:cutoff]))
+                        yield (l, w)
+                        words = words[cutoff:]
+                        labels = labels[cutoff:]
 
-                    if len(words) == 0:
+                    if not words:
                         continue
-                    l = ' '.join([label for label in labels if len(label) > 0])
-                    w = ' '.join([word for word in words if len(word) > 0])
-                    lines.append([l, w])
+                    l = ' '.join(filter(None, labels))
+                    w = ' '.join(filter(None, words))
+                    yield (l, w)
                     words = []
                     labels = []
-                    continue
-                
-                word = line.strip().split()[0]
-                label = line.strip().split()[-1]
-                words.append(word)
-                labels.append(label)
-            return lines
+
 
 class NerProcessor(DataProcessor):
     def get_train_examples(self, data_dir):
@@ -328,10 +325,10 @@ class NerProcessor(DataProcessor):
     @staticmethod
     def _create_example(lines, set_type):
         examples = []
-        for (i, line) in enumerate(lines):
+        for i, (label, word) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
-            text = tokenization.convert_to_unicode(line[1])
-            label = tokenization.convert_to_unicode(line[0])
+            text = tokenization.convert_to_unicode(word)
+            label = tokenization.convert_to_unicode(label)
             examples.append(InputExample(guid=guid, text=text, label=label))
         return examples
 
