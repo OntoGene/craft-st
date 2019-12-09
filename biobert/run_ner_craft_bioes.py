@@ -198,7 +198,7 @@ class DataProcessor(object):
                     while len(words) > 30:
                         tmplabel = labels[:30]
                         for _ in range(len(tmplabel)):
-                            if tmplabel.pop() == 'O':
+                            if tmplabel.pop().startswith('O'):
                                 break
                         cutoff = len(tmplabel) + 1
                         l = ' '.join(filter(None, labels[:cutoff]))
