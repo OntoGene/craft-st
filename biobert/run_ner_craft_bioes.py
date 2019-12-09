@@ -214,6 +214,10 @@ class DataProcessor(object):
                     yield (l, w)
                     words = []
                     labels = []
+        if words:
+            l = ' '.join(filter(None, labels))
+            w = ' '.join(filter(None, words))
+            yield (l, w)
 
 
 class NerProcessor(DataProcessor):
