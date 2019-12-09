@@ -336,68 +336,34 @@ class NerProcessor(DataProcessor):
 
 #* -----------------------------------------------------------------------------
     #? IDS FORMAT -->  CHEBI NUM_LABELS_JO = ...-> = 481   Joseph
-    @staticmethod
-    def _get_labels_ids():
-        ontology = FLAGS.onto
-        path_to_data = FLAGS.data_dir + 'tag_set.txt'
-        #path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        with open(path_to_data, 'r', encoding='utf-8') as f:
-            tag_set = [ line.rstrip() for line  in f]
-        print('before', len(tag_set), tag_set)
-        
-        tag_set.append("X")
-        tag_set.append("[CLS]")
-        tag_set.append("[SEP]")
-        
-        print('after', len(tag_set), tag_set,'\n\n\n\n\n')
-        print('IDS')
-        print_set_up(ontology, NUM_LABELS_JO, path_to_data)
-
-        return tag_set
-
-#* -----------------------------------------------------------------------------
+    def _get_labels_ids(self):
+        path_to_data = os.path.join(FLAGS.data_dir, 'tag_set.txt')
+        return self._get_id_tagset(path_to_data)
 
     # #? IDS AND PRETRAIN
     def _get_labels_pretrained_ids(self):
         return self._get_labels_pretraining()
 
-#* -----------------------------------------------------------------------------
-
     # #? PRETRAIN
     def _get_labels_pretrain(self):
         return self._get_labels_pretraining()
 
+    def _get_labels_pretraining(self):
+        path_to_data = os.path.join(FLAGS.data_dir, 'tag_set_pretrained.txt')
+        return self._get_id_tagset(path_to_data)
+
     @staticmethod
-    def _get_labels_pretraining():
-        ontology = FLAGS.onto
-        onto_size = FLAGS.label_format
-
-        # load DICT
-        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
-        
-        filename_list = glob.glob(path_to_data)
-        assert len(filename_list) == 1 , 'filename list contains more than one file'
-        filename = filename_list[0]
-        
-        with open(filename , 'r', encoding='utf-8') as f:
-            tag_set = [ line.rstrip() for line  in f]
-        tag_set_dict = set(tag_set)
-
-        # load IDs from training set
-        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        with open(path_to_data, 'r', encoding='utf-8') as f:
-            for line in f:
-                tag = line.rstrip()
-                if tag not in tag_set_dict:
-                    tag_set.append(tag)
+    def _get_id_tagset(filename):
+        with open(filename, 'r', encoding='utf-8') as f:
+            tag_set = [line.rstrip() for line  in f]
 
         tag_set.append("X")
         tag_set.append("[CLS]")
         tag_set.append("[SEP]")
 
-        print_set_up(ontology, NUM_LABELS_JO, path_to_data)
+        print_set_up(FLAGS.onto, NUM_LABELS_JO, filename)
 
-        print('after', len(tag_set), tag_set,'\n\n\n\n\n')
+        print('labels:', len(tag_set), tag_set, '\n\n\n\n\n')
         print(FLAGS.configuration.upper())
         print('SET SIZE: ', len(tag_set)+1)
 
