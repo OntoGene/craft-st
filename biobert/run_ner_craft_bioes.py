@@ -19,43 +19,6 @@ from tensorflow.python.ops import math_ops
 import tf_metrics
 import pickle
 import time
-import glob
-
-
-PROJDIR = os.path.join(os.path.dirname(__file__), 'data')
-
-
-# single  type 
-NUM_LABELS_D = {
-                'BIOES': 9,
-                'IOB': 7,
-                'GLOBAL': 45,
-                'CHEBI': 481,
-                'PR':945,
-                'GO_BP':582,
-                'PR.1000':1827,
-                'PR.5000':5564,
-                'GO_MF':9,
-                'SO':187,
-                'MOP': 21,
-                'UBERON':833,
-                'GO_BP': 582,
-                'NCBITaxon': 142,
-                'GO_CC':221,
-                'CL':236,
-                'SO_EXT':325,
-                'GO_MF_EXT':218,
-                'CHEBI_EXT':670,
-                'PR_EXT':1078,
-                'GO_BP_EXT':663,
-                'UBERON_EXT':883,  #new
-                'NCBITaxon_EXT':158, #new
-                'MOP_EXT':26,   #new
-                'CL_EXT':241,   #new
-                'GO_CC_EXT':252 #new
-                }
-
-LABEL_SET_PRETRAIN = {}
 
 
 # ----------------------------- FLAGS ------------------------------------------
@@ -160,45 +123,12 @@ flags.DEFINE_integer(
 
 # ------------------------- GET NUM LABELS -------------------------------------
 
-def set_up_env():
-    if FLAGS.configuration == 'pretrain':
-        ontology = FLAGS.onto
-        onto_size = FLAGS.label_format
-
-        # load DICT
-        path_to_data = f'{PROJDIR}/data/pretrain/{onto_size}/tag_set_{onto_size}*.txt'
-        
-        filename_list = glob.glob(path_to_data)
-        assert len(filename_list) == 1 , 'filename list contains more than one file'
-        filename = filename_list[0]
-        
-        tag_set_dict = []
-        with open(filename , 'r', encoding='utf-8') as f:
-            tag_set_dict = [ line.rstrip() for line  in f]
-
-        # load IDs
-        path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        tag_set_ids = []
-        with open(path_to_data, 'r', encoding='utf-8') as f:
-            tag_set_ids = [ line.rstrip() for line  in f]
-        
-        set_tag_set = set(tag_set_dict + tag_set_ids)
-        tag_set = list(set_tag_set)
-        
-        num_labels = 4 + len(tag_set) # CLS, SEP, X, + 1
-
-
-    else:
-        num_labels = NUM_LABELS_D[FLAGS.label_format]
-    
-    return num_labels
-
 
 def print_set_up(ontology, num_labels, path_to_data):
 
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
         print('{:{align}{width}}'.format( ontology , align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', num_labels, width='20'))
+        print('{:{width}}{}: {}'.format(' ', 'num_labels', num_labels, width='20'))
         print('{:{width}}{}: {}'.format(' ', 'PATH TO DATA', path_to_data, width='20'))
         print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
         time.sleep(5.5)    
@@ -320,14 +250,14 @@ class NerProcessor(DataProcessor):
 
 #* -----------------------------------------------------------------------------
 
-    #? BIOES FORMAT -->  NUM_LABELS_JO = 9 = 1*4 + 4 + 1   Joseph
+    #? BIOES FORMAT -->  num_labels = 9 = 1*4 + 4 + 1   Joseph
     @staticmethod
     def _get_labels_bioes():
         print('BIOES')
 
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
         print('{:{align}{width}}'.format('BIOES', align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', NUM_LABELS_JO, width='20'))
+        print('{:{width}}{}: {}'.format(' ', 'num_labels', 9, width='20'))
         print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
         time.sleep(5.5)      
 
@@ -335,7 +265,7 @@ class NerProcessor(DataProcessor):
 
 
 #* -----------------------------------------------------------------------------
-    #? IDS FORMAT -->  CHEBI NUM_LABELS_JO = ...-> = 481   Joseph
+    #? IDS FORMAT -->  CHEBI num_labels = ...-> = 481   Joseph
     def _get_labels_ids(self):
         path_to_data = os.path.join(FLAGS.data_dir, 'tag_set.txt')
         return self._get_id_tagset(path_to_data)
@@ -361,7 +291,7 @@ class NerProcessor(DataProcessor):
         tag_set.append("[CLS]")
         tag_set.append("[SEP]")
 
-        print_set_up(FLAGS.onto, NUM_LABELS_JO, filename)
+        print_set_up(FLAGS.onto, len(tag_set)+1, filename)
 
         print('labels:', len(tag_set), tag_set, '\n\n\n\n\n')
         print(FLAGS.configuration.upper())
@@ -372,12 +302,12 @@ class NerProcessor(DataProcessor):
 
 #* -----------------------------------------------------------------------------
 
-    # #? GLOBAL BIOES FORMAT -->  NUM_LABELS_JO = 10*4 + 4 + 1 = 45 Joseph
+    # #? GLOBAL BIOES FORMAT -->  num_labels = 10*4 + 4 + 1 = 45 Joseph
     @staticmethod
     def _get_labels_global():
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
         print('{:{align}{width}}'.format('GLOBAL', align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', NUM_LABELS_JO, width='20'))
+        print('{:{width}}{}: {}'.format(' ', 'num_labels', 45, width='20'))
         print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
         time.sleep(5.5)
             
@@ -581,7 +511,7 @@ def create_model(bert_config, is_training, input_ids, input_mask,
         output_layer = tf.reshape(output_layer, [-1, hidden_size])
         logits = tf.matmul(output_layer, output_weight, transpose_b=True)
         logits = tf.nn.bias_add(logits, output_bias)
-        logits = tf.reshape(logits, [-1, FLAGS.max_seq_length, NUM_LABELS_JO])
+        logits = tf.reshape(logits, [-1, FLAGS.max_seq_length, num_labels])
         # mask = tf.cast(input_mask,tf.float32)
         # loss = tf.contrib.seq2seq.sequence_loss(logits,labels,mask)
         # return (loss, logits, predict)
@@ -645,9 +575,9 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
             def metric_fn(per_example_loss, label_ids, logits):
             # def metric_fn(label_ids, logits):
                 predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                precision = tf_metrics.precision(label_ids, predictions, NUM_LABELS_JO, [1, 2], average="macro")
-                recall = tf_metrics.recall(label_ids, predictions, NUM_LABELS_JO, [1, 2], average="macro")
-                f = tf_metrics.f1(label_ids, predictions, NUM_LABELS_JO, [1, 2], average="macro")
+                precision = tf_metrics.precision(label_ids, predictions, num_labels, [1, 2], average="macro")
+                recall = tf_metrics.recall(label_ids, predictions, num_labels, [1, 2], average="macro")
+                f = tf_metrics.f1(label_ids, predictions, num_labels, [1, 2], average="macro")
                 #
                 return {
                     "eval_precision": precision,
@@ -854,9 +784,5 @@ if __name__ == "__main__":
     flags.mark_flag_as_required("vocab_file")
     flags.mark_flag_as_required("bert_config_file")
     flags.mark_flag_as_required("output_dir")
-
-
-    #! JOSEPH
-    NUM_LABELS_JO = set_up_env()
 
     tf.app.run()
