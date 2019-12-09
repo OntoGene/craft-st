@@ -42,6 +42,11 @@ flags.DEFINE_string(
     "configuration", None, "The configuration to run"
 )
 
+# Symbol for "outside" (irrelevant), ie. 'O', 'NIL' etc.
+flags.DEFINE_string(
+    "outside_symbol", 'O', 'symbol for irrelevant tokens'
+)
+
 
 #-------------------------------------------------------------------------------
 
@@ -777,9 +782,9 @@ def main(_):
                 for pidx, prediction in enumerate(result):
                     slen = len(tokens[pidx])
 
-                    output_line = "\n".join(
-                        id2label[id] if id != 0 else id2label[3]
-                        for id in prediction['prediction'][:slen]) #change to O tag
+                    output_line = "\n".join(  # change 0 predictions to 'O'
+                        id2label.get(id, FLAGS.outside_symbol)
+                        for id in prediction['prediction'][:slen])
                     p_writer.write(output_line + "\n")
 
                     output_line = "\n".join(

@@ -39,12 +39,14 @@ echo "Set environment variables\n"
 #! ++++++++++++++++++++++++++++++++++++++++
 BIOBERT_DIR="$projdir/weights/biobert_v1.1_pubmed"
 
+OUTSIDE='O-NIL'
 
 
 if [ $configuration = "global" ];then
     NER_DIR="$projdir/data/global"
     TMP_DIR="$projdir/tmp/global"
     LABEL_FORMAT='GLOBAL'
+    OUTSIDE='O'
 
 elif [ $configuration = "ids" ];then
     NER_DIR="$projdir/data/ids/${ontology}"
@@ -76,6 +78,7 @@ else
 
     LABEL_FORMAT=$label_detail
     ONTOLOGY=$ontology
+    OUTSIDE='O'
 fi
 
 
@@ -115,6 +118,7 @@ CUDA_VISIBLE_DEVICES=$cvd python run_ner_craft_bioes.py \
     --output_dir=$TMP_DIR \
     --onto=$ONTOLOGY \
     --label_format=$LABEL_FORMAT \
+    --outside_symbol=$OUTSIDE \
     --configuration=$configuration
 
 
