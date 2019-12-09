@@ -55,15 +55,8 @@ NUM_LABELS_D = {
                 'GO_CC_EXT':252 #new
                 }
 
-LABEL_SET_PRETRAIN = {} 
-#! init as global const
-NUM_LABELS_JO = 0
-                
-#? NUM_LABELS_JO = 9 # the number of labels + 1. To shape the matrix. Joseph >>> before 7 <<<
+LABEL_SET_PRETRAIN = {}
 
-
-# global model
-#+ NUM_LABELS_JO = 45 
 
 # ----------------------------- FLAGS ------------------------------------------
 
@@ -167,7 +160,7 @@ flags.DEFINE_integer(
 
 # ------------------------- GET NUM LABELS -------------------------------------
 
-def set_up_env(NUM_LABELS_JO):
+def set_up_env():
     if FLAGS.configuration == 'pretrain':
         ontology = FLAGS.onto
         onto_size = FLAGS.label_format
@@ -192,20 +185,20 @@ def set_up_env(NUM_LABELS_JO):
         set_tag_set = set(tag_set_dict + tag_set_ids)
         tag_set = list(set_tag_set)
         
-        NUM_LABELS_JO = 4 + len(tag_set) # CLS, SEP, X, + 1
+        num_labels = 4 + len(tag_set) # CLS, SEP, X, + 1
 
 
     else:
-        NUM_LABELS_JO = NUM_LABELS_D[FLAGS.label_format]
+        num_labels = NUM_LABELS_D[FLAGS.label_format]
     
-    return NUM_LABELS_JO
+    return num_labels
 
 
-def print_set_up(ontology, NUM_LABELS_JO, path_to_data):
+def print_set_up(ontology, num_labels, path_to_data):
 
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
         print('{:{align}{width}}'.format( ontology , align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', NUM_LABELS_JO, width='20'))
+        print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', num_labels, width='20'))
         print('{:{width}}{}: {}'.format(' ', 'PATH TO DATA', path_to_data, width='20'))
         print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
         time.sleep(5.5)    
@@ -311,22 +304,25 @@ class NerProcessor(DataProcessor):
         return self._create_example(
             self._read_data(os.path.join(data_dir, "test.tsv")), "test")
 
+    def get_labels(self, config='iob'):
+        """Get all output labels."""
+        return getattr(self, f'_get_labels_{config}')()
+
 #* -----------------------------------------------------------------------------
     
     #? IOB FORMAT 
-    def get_labels_iob(self):
-    
+    @staticmethod
+    def _get_labels_iob():
         print('IOB')
-        time.sleep(5.5)      
+        time.sleep(5.5)
 
         return ["B", "I", "O", "X", "[CLS]", "[SEP]"]
 
 #* -----------------------------------------------------------------------------
 
     #? BIOES FORMAT -->  NUM_LABELS_JO = 9 = 1*4 + 4 + 1   Joseph
-    def get_labels_bioes(self):
-        assert FLAGS.configuration == 'bioes', 'get_labels() function and configuration does not match'
-
+    @staticmethod
+    def _get_labels_bioes():
         print('BIOES')
 
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
@@ -340,13 +336,11 @@ class NerProcessor(DataProcessor):
 
 #* -----------------------------------------------------------------------------
     #? IDS FORMAT -->  CHEBI NUM_LABELS_JO = ...-> = 481   Joseph
-    def get_labels_ids(self):
-        assert FLAGS.configuration == 'ids', 'get_labels() function and configuration does not match'
-        
+    @staticmethod
+    def _get_labels_ids():
         ontology = FLAGS.onto
         path_to_data = FLAGS.data_dir + 'tag_set.txt'
         #path_to_data = f'{PROJDIR}/data/ids/{ontology}/tag_set.txt'
-        tag_set = []
         with open(path_to_data, 'r', encoding='utf-8') as f:
             tag_set = [ line.rstrip() for line  in f]
         print('before', len(tag_set), tag_set)
@@ -364,15 +358,13 @@ class NerProcessor(DataProcessor):
 #* -----------------------------------------------------------------------------
 
     # #? IDS AND PRETRAIN
-    def get_labels_pretrained_ids(self):
-        assert FLAGS.configuration == 'pretrained_ids', 'get_labels() function and configuration does not match'
+    def _get_labels_pretrained_ids(self):
         return self._get_labels_pretraining()
 
 #* -----------------------------------------------------------------------------
 
     # #? PRETRAIN
-    def get_labels_pretrain(self):
-        assert FLAGS.configuration == 'pretrain', 'get_labels() function and configuration does not match'
+    def _get_labels_pretrain(self):
         return self._get_labels_pretraining()
 
     @staticmethod
@@ -415,7 +407,8 @@ class NerProcessor(DataProcessor):
 #* -----------------------------------------------------------------------------
 
     # #? GLOBAL BIOES FORMAT -->  NUM_LABELS_JO = 10*4 + 4 + 1 = 45 Joseph
-    def get_labels_global(self):
+    @staticmethod
+    def _get_labels_global():
         print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
         print('{:{align}{width}}'.format('GLOBAL', align='^', width='80'))
         print('{:{width}}{}: {}'.format(' ', 'NUM_LABELS_JO', NUM_LABELS_JO, width='20'))
@@ -436,7 +429,8 @@ class NerProcessor(DataProcessor):
 
 #* -----------------------------------------------------------------------------
 
-    def _create_example(self, lines, set_type):
+    @staticmethod
+    def _create_example(lines, set_type):
         examples = []
         for (i, line) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
@@ -741,22 +735,7 @@ def main(_):
         raise ValueError("Task not found: %s" % (task_name))
     processor = processors[task_name]()
 
-    #! JOSEPH
-    if FLAGS.configuration == 'iob':
-        label_list = processor.get_labels_iob()
-    elif FLAGS.configuration == 'bioes':
-        label_list = processor.get_labels_bioes()
-    elif FLAGS.configuration == 'ids':
-        label_list = processor.get_labels_ids()
-    elif FLAGS.configuration == 'pretrain':
-        label_list = processor.get_labels_pretrain()
-    elif FLAGS.configuration == 'pretrained_ids':
-        label_list = processor.get_labels_pretrained_ids()
-    elif FLAGS.configuration == 'global':
-        label_list = processor.get_labels_global()
-    else:
-        assert False, 'False configuration'
-    
+    label_list = processor.get_labels(FLAGS.configuration)
 
     tokenizer = tokenization.FullTokenizer(
         vocab_file=FLAGS.vocab_file, do_lower_case=FLAGS.do_lower_case)
@@ -910,10 +889,8 @@ if __name__ == "__main__":
     flags.mark_flag_as_required("bert_config_file")
     flags.mark_flag_as_required("output_dir")
 
-    
-      
 
     #! JOSEPH
-    NUM_LABELS_JO = set_up_env(NUM_LABELS_JO) 
+    NUM_LABELS_JO = set_up_env()
 
     tf.app.run()
