@@ -5,9 +5,6 @@ Copyright 2018 The Google AI Language Team Authors.
 BASED ON Google_BERT.
 @Author:zhoukaiyin
 """
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 
 import collections
 import os
@@ -137,7 +134,7 @@ def print_set_up(ontology, num_labels, path_to_data):
 # ------------------------- FUNCTIONS ------------------------------------------
 
 
-class InputExample(object):
+class InputExample:
     """A single training/test example for simple sequence classification."""
 
     def __init__(self, guid, text, label=None):
@@ -155,7 +152,7 @@ class InputExample(object):
         self.label = label
 
 
-class InputFeatures(object):
+class InputFeatures:
     """A single set of features of data."""
 
     def __init__(self, input_ids, input_mask, segment_ids, label_ids,):
@@ -166,7 +163,7 @@ class InputFeatures(object):
         #self.label_mask = label_mask
 
 
-class DataProcessor(object):
+class DataProcessor:
     """Base class for data converters for sequence classification data sets."""
 
     def get_train_examples(self, data_dir):
