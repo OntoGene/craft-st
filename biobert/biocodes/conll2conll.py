@@ -27,6 +27,9 @@ def main():
         'tgt_fmt', metavar='TARGET_FORMAT', choices=('bert', 'craft'),
         help='convert to BERT or CRAFT format?')
     ap.add_argument(
+        '-l', '--label-format', choices=('spans', 'ids'), default='spans',
+        help='IOBES tags or IDs as labels?')
+    ap.add_argument(
         '-t', '--tgt-dir', type=Path, required=True, metavar='PATH',
         help='directory for output files')
     ap.add_argument(
@@ -46,7 +49,7 @@ def main():
     convert(**vars(args))
 
 
-def convert(tgt_fmt: str, tgt_dir: Path, **kwargs) -> None:
+def convert(tgt_fmt: str, tgt_dir: Path, label_format: str, **kwargs) -> None:
     """
     Convert between BERT and CRAFT format.
     """
@@ -54,9 +57,9 @@ def convert(tgt_fmt: str, tgt_dir: Path, **kwargs) -> None:
     tgt_dir.mkdir(exist_ok=True)
     if tgt_fmt == 'bert':
         filename = '_'.join(kwargs['subsets']) + '.tsv'
-        to_bert_fmt(docs, tgt_dir/filename)
+        to_bert_fmt(docs, tgt_dir/filename, label_format)
     elif tgt_fmt == 'craft':
-        to_craft_conll(docs, tgt_dir)
+        to_craft_conll(docs, tgt_dir, label_format)
     else:
         raise ValueError(f'unknown target format: {tgt_fmt}')
 
@@ -76,33 +79,46 @@ def _iter_input_docs(craft_dir: Path,
             yield docid, abb, craft_dir / f'{docid}.conll'
 
 
-def to_bert_fmt(docs, tgt_path):
+def to_bert_fmt(docs, tgt_path, label_format):
     """
     Create one long file in 2-column format.
     """
     with tgt_path.open('w', encoding='utf8') as f:
         writer = csv.writer(f, **TSV_FORMAT)
-        writer.writerows(_iter_bert_fmt(docs))
+        writer.writerows(_iter_bert_fmt(docs, label_format))
 
 
-def _iter_bert_fmt(docs):
+def _iter_bert_fmt(docs, label_format):
+    _fmt_label = {
+        'spans': _span_label_fmt,
+        'ids': _id_label_fmt,
+    }[label_format]
     for _, abb, path in docs:
         with path.open(encoding='utf8') as f:
             rows = csv.reader(f, **TSV_FORMAT)
             rows = abb.expand(rows)
             for row in rows:
                 if not any(row):
-                    yield row
+                    yield ()
                     continue
                 token, _, _, label, *_ = row
-                if label == 'O':
-                    label = 'O-NIL'
-                elif label.startswith(('B-', 'E-', 'S-')):
-                    label = f'I-{label[2:]}'
+                label = _fmt_label(label)
                 yield token, label
 
 
-def to_craft_conll(docs, tgt_dir):
+def _span_label_fmt(label):
+    return label[0]
+
+
+def _id_label_fmt(label):
+    if label == 'O':
+        label = 'O-NIL'
+    elif label.startswith(('B-', 'E-', 'S-')):
+        label = f'I-{label[2:]}'
+    return label
+
+
+def to_craft_conll(docs, tgt_dir, label_format):
     """
     Split BERT predictions into document-wise 4-column files.
     """
