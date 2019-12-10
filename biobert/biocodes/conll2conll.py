@@ -13,7 +13,7 @@ import csv
 import json
 import argparse
 from pathlib import Path
-from typing import List, Tuple, Iterator, Iterable
+from typing import Tuple, Iterator, Iterable
 
 from abbrevs import AbbrevMapper, TSV_FORMAT
 
@@ -147,7 +147,7 @@ def _iter_conll_fmt(ref_path, abb, predicted):
         orig = list(csv.reader(f, **TSV_FORMAT))
         expanded = abb.expand(orig)
         merged = _merge_craft_bert(expanded, predicted)
-        yield from abb.restore(merged)
+        yield from abb.restore(merged, scored=True)
 
 
 def _merge_craft_bert(ref_rows, pred_rows):
@@ -156,19 +156,19 @@ def _merge_craft_bert(ref_rows, pred_rows):
             yield ()
             continue
         tok, start, end, *_ = row
-        ptok, label, _ = next(pred_rows, None)  # raise ValueError on early end
+        ptok, label, logprob = next(pred_rows, None)  # raise ValueError on early end
         assert tok == ptok or ptok == '[UNK]' or tok.startswith(ptok), \
             f'conflicting tokens: {tok} vs. {ptok}'
-        yield tok, start, end, label
+        yield tok, start, end, label, logprob
 
 
 def _undo_wordpiece(pred_dir: Path, label_format: str
-                   ) -> Iterator[Tuple[str, str, List[float]]]:
-    """Iterate over triples <token, label, logits>."""
+                   ) -> Iterator[Tuple[str, str, float]]:
+    """Iterate over triples <token, label, logprob>."""
     ctrl_labels = _get_ctrl_labels(label_format)
     tp, lp, pp = (pred_dir/f'{x}_test.txt' for x in ('token', 'label', 'logits'))
     with tp.open(encoding='utf8') as t, lp.open() as l, pp.open() as p:
-        previous = None  # type: Tuple[str, str, List[float]]
+        previous = None  # type: Tuple[str, str, float]
         for token, label, logits in zip(t, l, p):
             token, label = token.strip(), label.strip()
             if token.startswith('##'):
@@ -186,8 +186,8 @@ def _undo_wordpiece(pred_dir: Path, label_format: str
                 else:
                     # Regular case.
                     label = ctrl_labels.get(label, label)  # replace with 'O'
-                    logits = list(map(float, logits.split()))
-                    previous = token, label, logits
+                    logprob = max(map(float, logits.split()[1:]))  # best score
+                    previous = token, label, logprob
         if previous is not None:
             yield previous
         # Sanity check: all file iterators must be exhausted.
