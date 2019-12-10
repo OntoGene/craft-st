@@ -448,6 +448,7 @@ class Dataset:
         'mutual': '_pick_mutual',
         'override': '_pick_override',
         'backoff': '_pick_backoff',
+        'invbackoff': '_pick_inv_backoff',
         'spans': '_pick_spans',
     }
 
@@ -518,6 +519,22 @@ class Dataset:
             t, c = self._span_feature_combination(t, feat)
         elif t == 0 and c != 0:
             t = term[1:].argmax()+1  # best relevant tag
+        return t, c
+
+    def _pick_inv_backoff(self, term, conc, feat):
+        """
+        Give preference to NER+feature, resort to NEN where missing.
+
+        This is the inverse of the "backoff" strategy.
+        If both NER and OGER vote for relevant, they override
+        any NEN prediction. Otherwise the NEN decision is
+        considered.
+        """
+        t, c = self._pick_spans(term, None, feat)
+        if t == 0:  # NER+OGER=NIL -> back-off to NER
+            c = conc.argmax()
+            if c != 0:
+                t = term[1:].argmax()+1  # best relevant tag
         return t, c
 
     def _pick_spans(self, term, _, feat):
