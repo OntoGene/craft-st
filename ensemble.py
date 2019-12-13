@@ -42,8 +42,9 @@ def main():
     etype = sys.argv[1]
     srcdir = Path(sys.argv[2])
     tgtdir = Path(sys.argv[3])
+    agreement = sys.argv[4] if len(sys.argv) > 4 else 'mutual'
     train.setup_logging()
-    merge(etype, srcdir, tgtdir)
+    merge(etype, srcdir, tgtdir, agreement)
 
 
 def merge(etype: str, srcdir: Path, tgtdir: Path, pick_best: bool = True,
