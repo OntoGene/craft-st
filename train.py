@@ -445,16 +445,27 @@ class Dataset:
 
     agreement_strategies = {
         'none': '_pick_raw',
+        'ids-only' : '_pick_raw',  # alias
         'mutual': '_pick_mutual',
         'override': '_pick_override',
         'backoff': '_pick_backoff',
+        'ids-first': '_pick_backoff',  # alias
         'invbackoff': '_pick_inv_backoff',
+        'spans-first': '_pick_inv_backoff',  # alias
         'spans': '_pick_spans',
+        'spans-only': '_pick_spans',  # alias
     }
 
     @staticmethod
     def _pick_raw(term, conc, _):
-        """Pick the highest-scoring tags, even if contradicting each other."""
+        """
+        Pick the highest-scoring tags, even if contradicting each other.
+
+        Since the evaluation script ignores annotations like
+        "S-NIL", and since the conll2craft script corrects
+        "O-CHEBI:XXX" to "S-CHEBI:XXX", the span tag is
+        effectively ignored.
+        """
         return term.argmax(), conc.argmax()
 
     @staticmethod
