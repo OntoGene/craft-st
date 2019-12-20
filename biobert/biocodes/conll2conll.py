@@ -50,7 +50,8 @@ def main():
         help='input directory containing BERT ID predictions')
     ap.add_argument(
         '-m', '--merge-strategy', metavar='STRATEGY', default='ids-first',
-        choices=('spans-only', 'ids-only', 'spans-first', 'ids-first'),
+        choices=('spans-only', 'ids-only', 'spans-first', 'ids-first',
+                 'spans-alone'),
         help='strategy for span/ID predictions (default: %(default)s)')
     ap.add_argument(
         '-a', '--abbrevs', type=Path, required=True, metavar='PATH',
@@ -168,7 +169,8 @@ class PredictionMerger:
         self.spans = (self._get_predictions(span_dir, 'spans')
                       if merge_strategy != 'ids-only' else None)
         self.ids = (self._get_predictions(id_dir, 'ids')
-                    if merge_strategy != 'spans-only' else None)
+                    if merge_strategy not in ('spans-only', 'spans-alone')
+                    else None)
         method_name = f'_next_label_{merge_strategy}'.replace('-', '_')
         self._next_label = getattr(self, method_name)
 
@@ -212,6 +214,13 @@ class PredictionMerger:
             feat = NIL if feat == 'O' else min(feat.split('-', 1)[1].split(';'))
             label, logprob = self._next_label(tok, feat)
             yield tok, start, end, label, logprob
+
+    def _next_label_spans_alone(self, ref_tok, _):
+        tag, logits = self._next_prediction(self.spans, ref_tok)
+        # Append dummy ID labels in order for abbrev restoration and
+        # conll2standoff conversion to work properly.
+        tag += '-NIL' if tag == 'O' else '-MISC'
+        return tag, exp(max(logits))
 
     def _next_label_spans_only(self, ref_tok, feat):
         tag, logits = self._next_prediction(self.spans, ref_tok)
