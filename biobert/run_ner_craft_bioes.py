@@ -6,10 +6,8 @@ BASED ON Google_BERT.
 @Author:zhoukaiyin
 """
 
-import collections
 import os
 import pickle
-import time
 
 import tensorflow as tf
 from tensorflow.python.ops import math_ops
@@ -27,24 +25,9 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 
-#! JOSEPH - Possible  BIOES, IOB, GLOBAL, CHEBI, PR, GO_BP
-flags.DEFINE_string(
-    "label_format", None, "The name of the format"
-)
-
-#! JOSEPH - Possible  CHEBI, PR, GO_BP, ...
-flags.DEFINE_string(
-    "onto", None, "The name of the Ontology"
-)
-
 #! JOSEPH
 flags.DEFINE_string(
     "configuration", None, "The configuration to run"
-)
-
-# Symbol for "outside" (irrelevant), ie. 'O', 'NIL' etc.
-flags.DEFINE_string(
-    "outside_symbol", 'O', 'symbol for irrelevant tokens'
 )
 
 
@@ -127,17 +110,6 @@ flags.DEFINE_integer(
     "num_tpu_cores", 8,
     "Only used if `use_tpu` is True. Total number of TPU cores to use.")
 
-# ------------------------- GET NUM LABELS -------------------------------------
-
-
-def print_set_up(ontology, num_labels, path_to_data):
-    print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
-    print('{:{align}{width}}'.format(ontology, align='^', width='80'))
-    print('{:{width}}{}: {}'.format(' ', 'num_labels', num_labels, width='20'))
-    print('{:{width}}{}: {}'.format(' ', 'PATH TO DATA', path_to_data, width='20'))
-    print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
-    time.sleep(5.5)
-
 
 # ------------------------- FUNCTIONS ------------------------------------------
 
@@ -158,17 +130,6 @@ class InputExample:
         self.guid = guid
         self.text = text
         self.label = label
-
-
-class InputFeatures:
-    """A single set of features of data."""
-
-    def __init__(self, input_ids, input_mask, segment_ids, label_ids,):
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.label_ids = label_ids
-        #self.label_mask = label_mask
 
 
 class DataProcessor:
@@ -206,22 +167,22 @@ class DataProcessor:
                             if tmplabel.pop().startswith('O'):
                                 break
                         cutoff = len(tmplabel) + 1
-                        l = ' '.join(filter(None, labels[:cutoff]))
-                        w = ' '.join(filter(None, words[:cutoff]))
+                        l = list(filter(None, labels[:cutoff]))
+                        w = list(filter(None, words[:cutoff]))
                         yield (l, w)
                         words = words[cutoff:]
                         labels = labels[cutoff:]
 
                     if not words:
                         continue
-                    l = ' '.join(filter(None, labels))
-                    w = ' '.join(filter(None, words))
+                    l = list(filter(None, labels))
+                    w = list(filter(None, words))
                     yield (l, w)
                     words = []
                     labels = []
         if words:
-            l = ' '.join(filter(None, labels))
-            w = ' '.join(filter(None, words))
+            l = list(filter(None, labels))
+            w = list(filter(None, words))
             yield (l, w)
 
 
@@ -242,6 +203,13 @@ class NerProcessor(DataProcessor):
 
     def get_labels(self, config='iob'):
         """Get all output labels."""
+        # Aliases.
+        config = dict(
+            bioes='iobes',
+            spans='iobes',
+            pretrain='pretraining',
+            pretrained_ids='pretraining',
+        ).get(config, config)
         return getattr(self, f'_get_labels_{config}')()
 
 #* -----------------------------------------------------------------------------
@@ -249,24 +217,13 @@ class NerProcessor(DataProcessor):
     #? IOB FORMAT
     @staticmethod
     def _get_labels_iob():
-        print('IOB')
-        time.sleep(5.5)
-
         return ["B", "I", "O", "X", "[CLS]", "[SEP]"]
 
 #* -----------------------------------------------------------------------------
 
     #? BIOES FORMAT -->  num_labels = 9 = 1*4 + 4 + 1   Joseph
     @staticmethod
-    def _get_labels_bioes():
-        print('BIOES')
-
-        print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
-        print('{:{align}{width}}'.format('BIOES', align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'num_labels', 9, width='20'))
-        print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
-        time.sleep(5.5)
-
+    def _get_labels_iobes():
         return ["B", "I", "O", "X", "[CLS]", "[SEP]", "E", "S"]
 
 #* -----------------------------------------------------------------------------
@@ -275,14 +232,6 @@ class NerProcessor(DataProcessor):
     def _get_labels_ids(self):
         path_to_data = os.path.join(FLAGS.data_dir, 'tag_set.txt')
         return self._get_id_tagset(path_to_data)
-
-    # #? IDS AND PRETRAIN
-    def _get_labels_pretrained_ids(self):
-        return self._get_labels_pretraining()
-
-    # #? PRETRAIN
-    def _get_labels_pretrain(self):
-        return self._get_labels_pretraining()
 
     def _get_labels_pretraining(self):
         path_to_data = os.path.join(FLAGS.data_dir, 'tag_set_pretrained.txt')
@@ -297,8 +246,6 @@ class NerProcessor(DataProcessor):
         tag_set.append("[CLS]")
         tag_set.append("[SEP]")
 
-        print_set_up(FLAGS.onto, len(tag_set)+1, filename)
-
         print('labels:', len(tag_set), tag_set, '\n\n\n\n\n')
         print(FLAGS.configuration.upper())
         print('SET SIZE: ', len(tag_set)+1)
@@ -311,12 +258,6 @@ class NerProcessor(DataProcessor):
     # #? GLOBAL BIOES FORMAT -->  num_labels = 10*4 + 4 + 1 = 45 Joseph
     @staticmethod
     def _get_labels_global():
-        print('\n{:{align}{width}}'.format('*' * 60, align='^', width='80'))
-        print('{:{align}{width}}'.format('GLOBAL', align='^', width='80'))
-        print('{:{width}}{}: {}'.format(' ', 'num_labels', 45, width='20'))
-        print('{:{align}{width}}'.format('*' * 60 +'\n', align='^', width='80'))
-        time.sleep(5.5)
-
         return ["B-CHEBI", "I-CHEBI", "E-CHEBI", "S-CHEBI",
                 "B-CL", "I-CL", "E-CL", "S-CL",
                 "B-GO_BP", "I-GO_BP", "E-GO_BP", "S-GO_BP",
@@ -333,40 +274,19 @@ class NerProcessor(DataProcessor):
 
     @staticmethod
     def _create_example(lines, set_type):
-        examples = []
-        for i, (label, word) in enumerate(lines):
+        for i, (label, text) in enumerate(lines):
             guid = "%s-%s" % (set_type, i)
-            text = tokenization.convert_to_unicode(word)
-            label = tokenization.convert_to_unicode(label)
-            examples.append(InputExample(guid=guid, text=text, label=label))
-        return examples
+            yield InputExample(guid=guid, text=text, label=label)
 
 
-def write_tokens(tokens, mode):
-    if mode == "test":
-        path = os.path.join(FLAGS.output_dir, f"token_{mode}.txt")
-        wf = open(path, 'a')
-        for token in tokens:
-            if token != "**NULL**":
-                wf.write(token+'\n')
-        wf.close()
-
-
-def convert_single_example(ex_index, example, label_list,
-                           max_seq_length, tokenizer, mode):
-    label_map = {}
-    for (i, label) in enumerate(label_list, 1):
-        label_map[label] = i
-    with open(os.path.join(FLAGS.output_dir, 'label2id.pkl'), 'wb') as w:
-        pickle.dump(label_map, w)
-    textlist = example.text.split(' ')
-    labellist = example.label.split(' ')
+def convert_single_example(example, label_map,
+                           max_seq_length, tokenizer, token_file):
     tokens = []
     labels = []
-    for i, word in enumerate(textlist):
+    for i, word in enumerate(example.text):
         token = tokenizer.tokenize(word)
         tokens.extend(token)
-        label_1 = labellist[i]
+        label_1 = example.label[i]
         for m in range(len(token)):
             if m == 0:
                 labels.append(label_1)
@@ -393,65 +313,48 @@ def convert_single_example(ex_index, example, label_list,
     label_ids.append(label_map["[SEP]"])
     input_ids = tokenizer.convert_tokens_to_ids(ntokens)
     input_mask = [1] * len(input_ids)
-    #label_mask = [1] * len(input_ids)
     while len(input_ids) < max_seq_length:
         input_ids.append(0)
         input_mask.append(0)
         segment_ids.append(0)
         # we don't concerned about it!
         label_ids.append(0)
-        ntokens.append("**NULL**")
-        #label_mask.append(0)
-    # print(len(input_ids))
     assert len(input_ids) == max_seq_length
     assert len(input_mask) == max_seq_length
     assert len(segment_ids) == max_seq_length
     assert len(label_ids) == max_seq_length
-    #assert len(label_mask) == max_seq_length
 
-    if ex_index < 5:
-        tf.logging.info("*** Example ***")
-        tf.logging.info("guid: %s" % (example.guid))
-        tf.logging.info("tokens: %s" % " ".join(
-            [tokenization.printable_text(x) for x in tokens]))
-        tf.logging.info("input_ids: %s" % " ".join([str(x) for x in input_ids]))
-        tf.logging.info("input_mask: %s" % " ".join([str(x) for x in input_mask]))
-        tf.logging.info("segment_ids: %s" % " ".join([str(x) for x in segment_ids]))
-        tf.logging.info("label_ids: %s" % " ".join([str(x) for x in label_ids]))
-        #tf.logging.info("label_mask: %s" % " ".join([str(x) for x in label_mask]))
-
-    feature = InputFeatures(
-        input_ids=input_ids,
-        input_mask=input_mask,
-        segment_ids=segment_ids,
-        label_ids=label_ids,
-        #label_mask = label_mask
+    feature = dict(
+        input_ids=create_int_feature(input_ids),
+        input_mask=create_int_feature(input_mask),
+        segment_ids=create_int_feature(segment_ids),
+        label_ids=create_int_feature(label_ids),
     )
-    write_tokens(ntokens, mode)
+    if token_file is not None:
+        for token in ntokens:
+            token_file.write(token)
+            token_file.write('\n')
     return feature
 
 
+def create_int_feature(values):
+    return tf.train.Feature(int64_list=tf.train.Int64List(value=values))
+
+
 def file_based_convert_examples_to_features(
-        examples, label_list, max_seq_length, tokenizer, output_file, mode=None
-):
+        examples, label_list, max_seq_length, tokenizer, output_file,
+        token_file=None):
+    label_map = {label: i for i, label in enumerate(label_list, 1)}
+    with open(os.path.join(FLAGS.output_dir, 'label2id.pkl'), 'wb') as w:
+        pickle.dump(label_map, w)
     writer = tf.python_io.TFRecordWriter(output_file)
     for (ex_index, example) in enumerate(examples):
         if ex_index % 5000 == 0:
-            tf.logging.info("Writing example %d of %d" % (ex_index, len(examples)))
-        feature = convert_single_example(ex_index, example, label_list,
-                                         max_seq_length, tokenizer, mode)
-
-        def create_int_feature(values):
-            f = tf.train.Feature(int64_list=tf.train.Int64List(value=list(values)))
-            return f
-
-        features = collections.OrderedDict()
-        features["input_ids"] = create_int_feature(feature.input_ids)
-        features["input_mask"] = create_int_feature(feature.input_mask)
-        features["segment_ids"] = create_int_feature(feature.segment_ids)
-        features["label_ids"] = create_int_feature(feature.label_ids)
-        #features["label_mask"] = create_int_feature(feature.label_mask)
-        tf_example = tf.train.Example(features=tf.train.Features(feature=features))
+            tf.logging.info("Writing example %d", ex_index)
+        feature = convert_single_example(example, label_map,
+                                         max_seq_length, tokenizer, token_file)
+        tf_example = tf.train.Example(
+            features=tf.train.Features(feature=feature))
         writer.write(tf_example.SerializeToString())
 
 
@@ -461,8 +364,6 @@ def file_based_input_fn_builder(input_file, seq_length, is_training, drop_remain
         "input_mask": tf.FixedLenFeature([seq_length], tf.int64),
         "segment_ids": tf.FixedLenFeature([seq_length], tf.int64),
         "label_ids": tf.FixedLenFeature([seq_length], tf.int64),
-        # "label_ids":tf.VarLenFeature(tf.int64),
-        #"label_mask": tf.FixedLenFeature([seq_length], tf.int64),
     }
 
     def _decode_record(record, name_to_features):
@@ -617,16 +518,10 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 # -------------------------------- Main ----------------------------------------
 
 def main(_):
-    for key in tf.app.flags.FLAGS.flag_values_dict():
-        print(key, FLAGS[key].value)
-    time.sleep(5)
-
     tf.logging.set_verbosity(tf.logging.INFO)
     processors = {
         "ner": NerProcessor
     }
-    if not FLAGS.do_train and not FLAGS.do_eval:
-        raise ValueError("At least one of `do_train` or `do_eval` must be True.")
 
     bert_config = modeling.BertConfig.from_json_file(FLAGS.bert_config_file)
 
@@ -667,7 +562,7 @@ def main(_):
     num_warmup_steps = None
 
     if FLAGS.do_train:
-        train_examples = processor.get_train_examples(FLAGS.data_dir)
+        train_examples = list(processor.get_train_examples(FLAGS.data_dir))
         num_train_steps = int(
             len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
         num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
@@ -695,7 +590,6 @@ def main(_):
         file_based_convert_examples_to_features(
             train_examples, label_list, FLAGS.max_seq_length, tokenizer, train_file)
         tf.logging.info("***** Running training *****")
-        tf.logging.info("  Num examples = %d", len(train_examples))
         tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
         tf.logging.info("  Num steps = %d", num_train_steps)
         train_input_fn = file_based_input_fn_builder(
@@ -711,10 +605,10 @@ def main(_):
             eval_examples, label_list, FLAGS.max_seq_length, tokenizer, eval_file)
 
         tf.logging.info("***** Running evaluation *****")
-        tf.logging.info("  Num examples = %d", len(eval_examples))
         tf.logging.info("  Batch size = %d", FLAGS.eval_batch_size)
         eval_steps = None
         if FLAGS.use_tpu:
+            eval_examples = list(eval_examples)
             eval_steps = int(len(eval_examples) / FLAGS.eval_batch_size)
         eval_drop_remainder = True if FLAGS.use_tpu else False
         eval_input_fn = file_based_input_fn_builder(
@@ -734,17 +628,15 @@ def main(_):
         with open(os.path.join(FLAGS.output_dir, 'label2id.pkl'), 'rb') as rf:
             label2id = pickle.load(rf)
             id2label = {value: key for key, value in label2id.items()}
-        if os.path.exists(token_path):
-            os.remove(token_path)
         predict_examples = processor.get_test_examples(FLAGS.data_dir)
 
         predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
-        file_based_convert_examples_to_features(predict_examples, label_list,
-                                                FLAGS.max_seq_length, tokenizer,
-                                                predict_file,mode="test")
+        with open(token_path, 'w') as token_file:
+            file_based_convert_examples_to_features(
+                predict_examples, label_list, FLAGS.max_seq_length, tokenizer,
+                predict_file, token_file)
 
         tf.logging.info("***** Running prediction*****")
-        tf.logging.info("  Num examples = %d", len(predict_examples))
         tf.logging.info("  Batch size = %d", FLAGS.predict_batch_size)
         if FLAGS.use_tpu:
             # Warning: According to tpu_estimator.py Prediction on TPU is an
@@ -769,21 +661,18 @@ def main(_):
                 else:
                     tmp_toks.append(tok)
 
-        prf = estimator.evaluate(input_fn=predict_input_fn, steps=None)
-        tf.logging.info("***** token-level evaluation results *****")
-        for key in sorted(prf.keys()):
-            tf.logging.info("  %s = %s", key, str(prf[key]))
-
         result = estimator.predict(input_fn=predict_input_fn)
         output_predict_file = os.path.join(FLAGS.output_dir, "label_test.txt")
         output_logits_file = os.path.join(FLAGS.output_dir, "logits_test.txt")
+        id_conf = ('ids', 'pretrain', 'pretrained_ids')
+        outside_symbol = 'O-NIL' if FLAGS.configuration in id_conf else 'O'
         with open(output_predict_file, 'w') as p_writer:
             with open(output_logits_file, 'w') as l_writer:
                 for pidx, prediction in enumerate(result):
                     slen = len(tokens[pidx])
 
                     output_line = "\n".join(  # change 0 predictions to 'O'
-                        id2label.get(id, FLAGS.outside_symbol)
+                        id2label.get(id, outside_symbol)
                         for id in prediction['prediction'][:slen])
                     p_writer.write(output_line + "\n")
 
