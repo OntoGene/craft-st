@@ -12,8 +12,9 @@ craft2bert () {
 	python3 biocodes/conll2conll.py bert -l $level \
 		-t data/data/$level/$etype \
 		-c ../labeled.feat/$etype \
-		-a ../abbrevs.json -s ../splits.subm.json \
+		-s ../splits.subm.json \
 		-S $subset
+		# -a ../abbrevs.json
 }
 
 mk_tagset() {
@@ -41,6 +42,7 @@ bert2craft() {
 		-p data/tmp/spans-$etype \
 		-i data/tmp/${pret}ids-${etype}${pret:+.1000} \
 		-m $harm \
-		-a ../abbrevs.json -s ../splits.subm.json \
+		-s ../splits.subm.json \
 		-S test
+		# -a ../abbrevs.json
 }

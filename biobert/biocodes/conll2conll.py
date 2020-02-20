@@ -54,7 +54,7 @@ def main():
                  'spans-alone'),
         help='strategy for span/ID predictions (default: %(default)s)')
     ap.add_argument(
-        '-a', '--abbrevs', type=Path, required=True, metavar='PATH',
+        '-a', '--abbrevs', type=Path, metavar='PATH',
         help='a JSON file with short/long mappings per document '
              '(format: {"docid": {"xyz": "xtra young zebra", ...}})')
     ap.add_argument(
@@ -93,8 +93,13 @@ def _iter_input_docs(craft_dir: Path,
                     ) -> Iterator[Tuple[str, AbbrevMapper, Path]]:
     with splits.open() as f:
         folds = json.load(f)
-    with abbrevs.open() as f:
-        docwise_abbrevs = json.load(f)
+    if abbrevs is None:
+        # A dummy object that returns an empty dict for any key.
+        docwise_abbrevs = type('Dummy', (object,),
+                               {'__getitem__': staticmethod(lambda _: {})})()
+    else:
+        with abbrevs.open() as f:
+            docwise_abbrevs = json.load(f)
     for subset in subsets:
         for docid in folds[0][subset]:
             abb = AbbrevMapper(docwise_abbrevs[docid])

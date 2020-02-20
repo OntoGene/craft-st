@@ -32,7 +32,7 @@ CORPUS = HERE / 'labeled.feat'
 SPLITS = HERE / 'splits.subm.json'
 VOCAB = HERE / 'vocab.res.txt'
 ALPHABET = HERE / 'alphabet.txt'
-ABBREVS = HERE / 'abbrevs.json'
+ABBREVS = None  # HERE / 'abbrevs.json'
 WVECTORS = HERE / 'w2v200.res.npy'
 
 
@@ -79,7 +79,7 @@ def load_data(model_path: Path, etype: str, fold: int):
     vocab = train.read_vocab(VOCAB)
     alphabet = train.read_vocab(ALPHABET)
     labels = train.read_vocab(model_path.with_suffix('.labels'), reserved=0)
-    abbrevs = train.read_json(ABBREVS)
+    abbrevs = train.read_json(ABBREVS) if ABBREVS else None
     data = train.Dataset.from_files(conll_files, vocab=vocab, concept_ids=labels,
                                     abbrevs=abbrevs, alphabet=alphabet)
     docs = train.read_json(SPLITS)[fold]
