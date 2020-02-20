@@ -63,6 +63,9 @@ def main():
     ap.add_argument(
         '-S', '--subsets', nargs='+', required=True,
         choices=('train', 'dev', 'test'), help='corpus subset')
+    ap.add_argument(
+        '-f', '--fold', default=argparse.SUPPRESS, type=int, metavar='N',
+        help='which train/dev/test split (default: 0)')
     args = ap.parse_args()
     convert(**vars(args))
 
@@ -78,8 +81,10 @@ def convert(tgt_fmt: str, tgt_dir: Path,
     docs = _iter_input_docs(**kwargs)
     tgt_dir.mkdir(exist_ok=True)
     if tgt_fmt == 'bert':
-        filename = '_'.join(kwargs['subsets']) + '.tsv'
-        to_bert_fmt(docs, tgt_dir/filename, label_format)
+        filename = '_'.join(kwargs['subsets'])
+        if 'fold' in kwargs:
+            filename = '-'.join((filename, str(kwargs['fold'])))
+        to_bert_fmt(docs, tgt_dir/(filename+'.tsv'), label_format)
     elif tgt_fmt == 'craft':
         to_craft_conll(docs, tgt_dir, span_dir, id_dir, merge_strategy)
     else:
@@ -89,7 +94,8 @@ def convert(tgt_fmt: str, tgt_dir: Path,
 def _iter_input_docs(craft_dir: Path,
                      abbrevs: Path,
                      splits: Path,
-                     subsets: Iterable[str]  # train/test/dev
+                     subsets: Iterable[str],  # train/test/dev
+                     fold: int = 0
                     ) -> Iterator[Tuple[str, AbbrevMapper, Path]]:
     with splits.open() as f:
         folds = json.load(f)
@@ -101,7 +107,7 @@ def _iter_input_docs(craft_dir: Path,
         with abbrevs.open() as f:
             docwise_abbrevs = json.load(f)
     for subset in subsets:
-        for docid in folds[0][subset]:
+        for docid in folds[fold][subset]:
             abb = AbbrevMapper(docwise_abbrevs[docid])
             yield docid, abb, craft_dir / f'{docid}.conll'
 
