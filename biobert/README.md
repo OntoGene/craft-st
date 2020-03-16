@@ -1,4 +1,9 @@
 # BioBERT
+
+> Note: This subdirectory is a (disconnected) fork of https://github.com/dmis-lab/biobert.
+> The following instructions are provided by the original developers from DMIS Lab.
+> For running BioBERT with the CRAFT corpus, please refer to the Bash scripts _train_craft.sh_ and _test_craft.sh_.
+
 This repository provides fine-tuning codes of BioBERT, a language representation model for biomedical domain, especially designed for biomedical text mining tasks such as biomedical named entity recognition, relation extraction, question answering, etc. Please refer to our paper [BioBERT: a pre-trained biomedical language representation model for biomedical text mining](http://arxiv.org/abs/1901.08746) for more details.
 
 ## Updates

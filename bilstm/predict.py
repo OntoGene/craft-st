@@ -25,7 +25,7 @@ import train
 
 
 # Hard-coded paths!
-HERE = Path(__file__).parent
+HERE = Path(__file__).resolve().parent.parent
 
 TGTDIR = HERE / 'fpred'
 CORPUS = HERE / 'labeled.feat'

@@ -25,7 +25,7 @@ FOLDS = 6
 TESTSET_SIZE = 30
 
 # Hard-coded paths!
-HERE = Path(__file__).parent
+HERE = Path(__file__).resolve().parent.parent
 
 CORPUS = HERE / 'labeled.feat'
 SPLITS = HERE / 'splits.subm.json'

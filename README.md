@@ -1,14 +1,14 @@
-# CRAFT-NN: Concept Recognition for CRAFT v3
+# CRAFT-NN: Parallel Concept Recognition for CRAFT v4
 
-CNN-BiLSTM for joint medical-entity recognition and normalisation.
+Parallel named entity recognition (NER) and normalisation (NEN) based on sequence labeling with either BiLSTM or BioBERT.
 
 
 ## Quick Guide
 
-- Get [CRAFT version 3](https://github.com/lfurrer/CRAFT).
+- Get [CRAFT v4](https://github.com/UCDenver-ccp/CRAFT).
 - Convert concept annotations to CoNLL format (see below).
-- Run the stand-alone script `train.py` (see `./run.py -h` for options) to train in a cross-validation setting.
-- Use `predicty.py` and `ensemble.py` to create predictions from the trained models.
+- Create dictionary-based predictions using [OGER](https://github.com/OntoGene/OGER) (optional part of both the BiLSTM and BioBERT system).
+- Train models with the code in _bilstm/_ or _biobert/_.
 - Convert the predictions from .conll back to .bionlp.
 - Evaluate with the [official evaluation suite](https://github.com/UCDenver-ccp/craft-shared-tasks).
 
@@ -18,7 +18,9 @@ CNN-BiLSTM for joint medical-entity recognition and normalisation.
 - Follow [the instructions](https://github.com/UCDenver-ccp/CRAFT/wiki/Alternative-annotation-file-formats) to create standoff-annotations in BioNLP format. Place them in a _bionlp_ subdirectory for each entity type.
 - Run `git submodule init` to get a clone of Pyysalo's standoff2conll converter.
 - Make sure the CRAFT corpus is available as a directory or link named _CRAFT_ in this directory.
-- Run `./bionlp2conll.sh <NAME> <PATH>`, where NAME is "CHEBI", "CL" etc. and PATH is the target directory.
+- Run `./bionlp2conll.sh <NAME> <PATH>`, where NAME is "CHEBI", "CL" etc. and PATH is the target directory. This creates a 4-column CoNLL file for each article.
+- If you use dictionary-based predictions, add them as a 5th column.
+- For the BioBERT system, use _biobert/biocodes/conll2conll.py_ to convert the documents to 2-column CoNLL, and the same script again to convert the predictions back to 4-column format (including prediction harmonisation).
 - For converting predicted CoNLL files back to standoff, run `standoff2conll/conll2standoff.py < path/to/doc.conll > path/to/doc.bionlp` for each document.
 
 

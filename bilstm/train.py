@@ -55,8 +55,8 @@ TSV_FORMAT = dict(
     quotechar=None,
 )
 
-# Directory containing this script.
-HERE = Path(__file__).parent
+# Root directory of the project.
+HERE = Path(__file__).resolve().parent.parent
 
 
 def main():
