@@ -2,6 +2,11 @@
 
 Parallel named entity recognition (NER) and normalisation (NEN) based on sequence labeling with either BiLSTM or BioBERT.
 
+## Introduction
+
+This repository hosts the code of our participation in the [CRAFT shared task 2019](https://sites.google.com/view/craft-shared-task-2019/).
+If you are interested in training a similar system for biomedical concept recognition, keep reading.
+If you rather want to use the trained system to predict entities in other texts, have a look at our [Zenodo deposit](https://doi.org/10.5281/zenodo.3822363).
 
 ## Quick Guide
 
